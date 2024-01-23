@@ -9,6 +9,8 @@ class Bezier:
         self.d_ = len(control_points) - 1
         self.path_ = None
 
+
+
     def cal_combination(self, t, k):
         return (math.factorial(self.d_) / (math.factorial(k) * math.factorial(self.d_ - k))) * t ** k * (1 - t) ** (
                 self.d_ - k)
