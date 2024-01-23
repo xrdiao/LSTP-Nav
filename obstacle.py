@@ -1,4 +1,6 @@
 from vector import Vector1
+
+
 class Obstacle:
     """
     Defines static obstacles in the simulation.
