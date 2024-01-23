@@ -14,6 +14,10 @@ class Bezier:
                 self.d_ - k)
 
     def get_bezier_point(self, t):
+        """
+        :param t: time step, [0,1]
+        :return bezier point, [x,y,z,...]
+        """
         assert 0 <= t <= 1
         point = [np.multiply(self.control_points_[k], self.cal_combination(t, k)) for k in
                  range(len(self.control_points_))]
@@ -37,7 +41,7 @@ class PieceBezierCurve:
 
 
 if __name__ == '__main__':
-    c = [[0, 0], [0, 1], [1, 2],[1,5],[0,7]]
+    c = [[0, 0], [0, 1], [1, 2], [1, 5], [0, 7]]
     b = Bezier(c)
     b.cal_bezier_path()
     plt.plot(b.path_[0], b.path_[1])
