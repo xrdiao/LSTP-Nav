@@ -52,18 +52,24 @@ class Simulator:
         return obs.id_
 
     def step(self):
+        curves = self.agents_[0].trajectory_.curves
+        x = []
+        y = []
+        for i in range(len(curves)):
+            x = np.concatenate((x, curves[i].trajectory_[0]))
+            y = np.concatenate((y, curves[i].trajectory_[1]))
+
         if self.GUI:
             plt.ion()
             plt.cla()
-            trajectory = self.agents_[0].trajectory_.trajectory_
-            plt.plot(trajectory[0], trajectory[1])
+            plt.plot(x,y)
 
             pos = np.array([self.agents_[i].position_[0] for i in range(len(self.agents_))])
             scatter = plt.scatter([pos[:, 0]], pos[:, 1], c=np.arange(len(self.agents_)))
             plt.legend(*(scatter.legend_elements()), loc='upper left', fontsize=8)
-            plt.xlim([0, 2])
-            plt.ylim([0, 2])
-            plt.pause(0.4)
+            plt.xlim([-.2, 5.2])
+            plt.ylim([-2, 2.5])
+            plt.pause(0.2)
             plt.ioff()
 
         for agentNo in self.agents_:
