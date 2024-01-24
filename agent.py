@@ -1,5 +1,6 @@
 from vector import Vector1
 from base_math import *
+from bezier import Bezier
 
 
 class Agent:
@@ -17,7 +18,9 @@ class Agent:
         self.maxSpeed_ = 0.0
         self.neighbor_dist_ = 0.0
         self.max_neighbors_ = 0
-        self.new_velocity = Vector1()
+        # self.new_velocity = Vector1()
+        self.trajectory_ = None
+        self.glob_vel_ = None
 
     def find_neighbors(self):
         """find the neighbors of the current agent"""
@@ -27,13 +30,19 @@ class Agent:
                                       self.simulator_.agents_[i].position_) < self.neighbor_dist_:
                 self.agent_neighbors_.append(self.simulator_.agents_[i])
 
-    def get_newVelocity(self):
+    def cal_trajectory(self) -> None:
+        """calculate the trajectory of the agent"""
+        b = Bezier([[0, 0], [0, 1], [1, 1.5], [2, 2]])
+        b.cal_bezier_path()
+        self.trajectory_ = b
+        self.glob_vel_ = b.derivation()
+
+    def get_new_velocity(self):
         """core code in such motion planning, for the other kind of the motion planning, the method's name should be
         'get_new_trajectory'. """
-        self.find_neighbors()
-
-        self.new_velocity = self.velocity_
+        new_velocity = self.glob_vel_.get_bezier_point(self.simulator_.global_time_)
+        return Vector1(new_velocity[0], new_velocity[1])
 
     def update(self):
-        self.velocity_ = self.new_velocity
+        self.velocity_ = self.get_new_velocity()
         self.position_ = self.position_ + self.velocity_ * self.simulator_.time_step_

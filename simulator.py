@@ -11,7 +11,7 @@ class Simulator:
         self.agents_ = []
         self.obstacles_ = []
         self.global_time_ = 0.0
-        self.time_step_ = 0.1
+        self.time_step_ = 0.01
         self.default_agent_ = None
         self.GUI = gui
 
@@ -55,16 +55,18 @@ class Simulator:
         if self.GUI:
             plt.ion()
             plt.cla()
+            trajectory = self.agents_[0].trajectory_.trajectory_
+            plt.plot(trajectory[0], trajectory[1])
+
             pos = np.array([self.agents_[i].position_[0] for i in range(len(self.agents_))])
             scatter = plt.scatter([pos[:, 0]], pos[:, 1], c=np.arange(len(self.agents_)))
             plt.legend(*(scatter.legend_elements()), loc='upper left', fontsize=8)
-            plt.xlim([-2, 2])
-            plt.ylim([-2, 2])
-            plt.pause(0.1)
+            plt.xlim([0, 2])
+            plt.ylim([0, 2])
+            plt.pause(0.4)
             plt.ioff()
 
         for agentNo in self.agents_:
-            agentNo.get_newVelocity()
             agentNo.update()
 
         self.global_time_ += self.time_step_
