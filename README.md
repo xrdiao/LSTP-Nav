@@ -1,1 +1,1 @@
-A baseline of robot optimal moiton planning.
+A baseline of robot optimal motion planning.
