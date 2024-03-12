@@ -126,7 +126,8 @@ class MyEnv(gym.Env):
         _info = {"distance": distances, "collision_num": self.collision_num}
         return np.array(laser_states), _reward, _done, _info
 
-    def reset(self, phase='train', test_case=None, init_state=None, init_goal=None, urdf_path="env_sim/utils/data/turtlebot.urdf"):
+    def reset(self, phase='train', test_case=None, init_state=None, init_goal=None,
+              urdf_path="env_sim/utils/data/turtlebot.urdf"):
         """
             what you need do here:
             - reset scene items
@@ -199,8 +200,8 @@ def createBoundaries(length, width):
 if __name__ == "__main__":
     env = MyEnv(render=True)
     goal = [1, 0]
-    env.add_robot([0, 0, 0, 0, 0, 0, 1.5], goal, 'utils/data/turtlebot.urdf')
-    env.add_robot([0, 1.5, 0, 0, 0, 0, 1], goal, 'utils/data/turtlebot.urdf')
+    env.add_robot([0, 0, 0.01, 0, 0, 0, 1.5], goal, 'utils/data/turtlebot.urdf')
+    env.add_robot([0, 0.5, 0.01, 0, 0, 0, 1], goal, 'utils/data/turtlebot.urdf')
     p.resetDebugVisualizerCamera(cameraDistance=3, cameraYaw=0, cameraPitch=-89.9,
                                  cameraTargetPosition=[0, 0, 0])
     # createBoundaries(10, 10)
