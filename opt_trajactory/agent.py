@@ -33,7 +33,7 @@ class Agent:
     def cal_trajectory(self) -> None:
         """calculate the trajectory of the agent"""
         curves = PieceBezierCurve([1, 1])
-        curves.set_all_control_points([[[0, 0], [0, 1], [1, 1.5], [2, 2]], [[2, 2], [3, 2], [4, 1], [5, 0]]])
+        curves.set_all_control_points([[[0, 0], [0, 1], [1, 2], [2, 2]], [[2, 2], [3, 2], [4, 1], [5, 0]]])
         self.trajectory_ = curves
         self.glob_vel_ = curves.derivation()
 

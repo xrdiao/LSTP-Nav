@@ -80,10 +80,7 @@ class PieceBezierCurve:
         for i in range(len(self.time_segment_)):
             if self.time_segment_[i] >= t:
                 t_l = 0 if i == 0 else self.time_segment_[i - 1]
-                t_r = self.time_segment_[i]
-                t_del = t_r - t_l
-
-                t_seg = (t - t_l) / t_del
+                t_seg = (t - t_l) / self.time_allocations_[i]
                 return self.curves[i].get_bezier_point(t_seg)
 
     def set_curve_control_points(self, control_points, index) -> None:

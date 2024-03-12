@@ -11,7 +11,7 @@ class Simulator:
         self.agents_ = []
         self.obstacles_ = []
         self.global_time_ = 0.0
-        self.time_step_ = 0.01
+        self.time_step_ = 0.005
         self.default_agent_ = None
         self.GUI = gui
 
@@ -62,14 +62,15 @@ class Simulator:
         if self.GUI:
             plt.ion()
             plt.cla()
-            plt.plot(x,y)
+            plt.plot(x, y)
 
             pos = np.array([self.agents_[i].position_[0] for i in range(len(self.agents_))])
             scatter = plt.scatter([pos[:, 0]], pos[:, 1], c=np.arange(len(self.agents_)))
+            plt.text(4, 2.3, "time:%.2f" % self.global_time_)
             plt.legend(*(scatter.legend_elements()), loc='upper left', fontsize=8)
             plt.xlim([-.2, 5.2])
-            plt.ylim([-2, 2.5])
-            plt.pause(0.2)
+            plt.ylim([-0.5, 2.5])
+            plt.pause(0.01)
             plt.ioff()
 
         for agentNo in self.agents_:
