@@ -17,17 +17,17 @@ class MyEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, scene_name: str = "plane_static_obstacle-A", render: bool = False, evaluate: bool = False):
+        self.time_step = 1. / 240.
 
         self._physics_client_id = p.connect(p.GUI if render else p.DIRECT)
         p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
         p.setGravity(0., 0., -9.8, physicsClientId=self._physics_client_id)
         p.setRealTimeSimulation(0)  # 1表示随着真实时间仿真，0表示要用p.step()进行步进
-        p.setTimeStep(1. / 240.)
+        p.setTimeStep(self.time_step)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.loadURDF("plane.urdf", physicsClientId=self._physics_client_id)
 
         self.time_limit = None
-        self.time_step = None
         self.robots = []  # a Robot instance representing the robot
         self.humans = []  # a list of Human instances, representing all humans in the environment
         self.global_time = 0
@@ -55,8 +55,8 @@ class MyEnv(gym.Env):
         )
         # 状态空间: laser1, ..., 5,   distance, alpha
         self.observation_space = spaces.Box(
-            low=np.array([0.] * self.LASER_NUM + [0., 0.], dtype=np.float32),
-            high=np.array([self.LASER_LENGTH + 1] * self.LASER_NUM + [self.MAX_DISTANCE, np.pi], dtype=np.float32),
+            low=np.array([0.] * self.LASER_NUM + [0.], dtype=np.float32),
+            high=np.array([self.LASER_LENGTH + 1] * self.LASER_NUM + [self.MAX_DISTANCE], dtype=np.float32),
         )
 
         self.init_state = []
@@ -74,7 +74,7 @@ class MyEnv(gym.Env):
         self.init_state.append(state)
         self.init_goal.append(_goal)
 
-    def checkCollision(self, robot_id, debug=False):
+    def checkCollision(self, robot_id, debug=True):
         if p.getContactPoints(bodyA=robot_id, linkIndexA=-1, physicsClientId=self._physics_client_id):
             if debug:
                 print("collsion happen!")
@@ -83,19 +83,20 @@ class MyEnv(gym.Env):
 
     def __reward_func(self, distances: list):
         rewards = []
-        _done = False
+        _done = np.zeros_like(self.robots, dtype=bool)
         for i, _rob in enumerate(self.robots):
             if distances[i] < 1e-2:
                 rg = ARRIVAL_REWARD
-                _done = True
+                _done[i] = True
             else:
                 rg = DISTANCE_REWARD_WEIGHT * (_rob.cur_dis.item() - distances[i])
 
             if self.checkCollision(_rob.robot):
                 rc = COLLISION_REWARD
-                _done = True
+                _done[i] = True
             else:
                 rc = 0
+
             rewards.append(rg + rc)
 
         return rewards, _done
@@ -104,10 +105,11 @@ class MyEnv(gym.Env):
         v1, v2 = np.array(v1), np.array(v2)
         return np.linalg.norm(v1 - v2)
 
-    def step(self, actions):
+    def step(self, actions) -> tuple[np.array, list, list, dict]:
         assert self.robots is not None, 'no robots loaded'
         assert self.robots_num == len(actions), 'incorrect action'
 
+        self.global_time += self.time_step
         for i, action in enumerate(actions):
             self.robots[i].apply_action(action)
         p.stepSimulation(physicsClientId=self._physics_client_id)
@@ -116,7 +118,6 @@ class MyEnv(gym.Env):
         for i in range(self.robots_num):
             _states.append(self.robots[i].get_observation())
 
-        laser_states = [_state[0] for _state in _states]
         distances = [_state[-1] for _state in _states]
         _reward, _done = self.__reward_func(distances)
 
@@ -124,7 +125,7 @@ class MyEnv(gym.Env):
         for i, _rob in enumerate(self.robots):
             _rob.cur_dis = distances[i]
         _info = {"distance": distances, "collision_num": self.collision_num}
-        return np.array(laser_states), _reward, _done, _info
+        return np.array(_states), _reward, _done, _info
 
     def reset(self, phase='train', test_case=None, init_state=None, init_goal=None,
               urdf_path="env_sim/utils/data/turtlebot.urdf"):
@@ -142,6 +143,7 @@ class MyEnv(gym.Env):
         p.resetSimulation(physicsClientId=self._physics_client_id)
         p.setGravity(0., 0., -9.8, physicsClientId=self._physics_client_id)
         p.setRealTimeSimulation(0)
+        p.setTimeStep(self.time_step)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.loadURDF("plane.urdf", physicsClientId=self._physics_client_id)
 
@@ -159,8 +161,7 @@ class MyEnv(gym.Env):
         _states = []
         for i in range(self.robots_num):
             _states.append(self.robots[i].get_observation())
-        laser_states = [_state[0] for _state in _states]
-        return laser_states
+        return np.array(_states)
 
     def render(self, mode='human'):
         pass
@@ -201,7 +202,7 @@ if __name__ == "__main__":
     env = MyEnv(render=True)
     goal = [1, 0]
     env.add_robot([0, 0, 0.01, 0, 0, 0, 1.5], goal, 'utils/data/turtlebot.urdf')
-    env.add_robot([0, 0.5, 0.01, 0, 0, 0, 1], goal, 'utils/data/turtlebot.urdf')
+    env.add_robot([0, 1.5, 0.01, 0, 0, 0, 1], goal, 'utils/data/turtlebot.urdf')
     p.resetDebugVisualizerCamera(cameraDistance=3, cameraYaw=0, cameraPitch=-89.9,
                                  cameraTargetPosition=[0, 0, 0])
     # createBoundaries(10, 10)

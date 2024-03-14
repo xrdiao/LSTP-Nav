@@ -13,11 +13,10 @@ class PolicyNet(nn.Module):
         self.fc_std = nn.Linear(n_hiddens, n_actions)
 
     # 前向传播
-    def forward(self, x):  #
+    def forward(self, x):
         x = self.fc1(x)  # [b, n_states] --> [b, n_hiddens]
         x = F.relu(x)
-        x = self.fc_mu(x)  # [b, n_hiddens] --> [b, n_actions]
-        mu = [torch.sigmoid(x[0]), torch.tanh(x[1])]  # mu=[velocity, rotational velocity]
+        mu = self.fc_mu(x)  # [b, n_hiddens] --> [b, n_actions] mu=[velocity, rotational velocity] * robots_num
         std = self.fc_std(x)  # [b, n_hiddens] --> [b, n_actions]
         std = F.softplus(std)  # 值域 小于0的部分逼近0，大于0的部分几乎不变
         return mu, std
@@ -59,82 +58,100 @@ class PPO:
 
         # 动作选择
 
-    def take_action(self, state):  # 输入当前时刻的状态
+    def take_action(self, states):  # 输入当前时刻的状态
+        '''
+
+        :param states: 所有机器人观测到的状态
+        :return: actions :所有机器人的下一个动作[robot1, robot2, ...]
+        '''
         # [n_states]-->[1,n_states]-->tensor
-        state = torch.tensor(state[np.newaxis, :]).to(self.device)
-        # 预测当前状态的动作，输出动作概率的高斯分布
-        mu, std = self.actor(state)
-        # 构造高斯分布
-        action_dict = torch.distributions.Normal(mu, std)
-        # 随机选择动作
-        action = action_dict.sample().item()
-        return [action]  # 返回动作值
+        robots_num = len(states)
+        actions = []
+        for i in range(robots_num):
+            state = torch.tensor(states[i], dtype=torch.float).to(self.device)
+            mu, std = self.actor(state)  # 预测下一个动作
+
+            vel_dict = torch.distributions.Normal(mu[0], std[0])
+            _vel = vel_dict.sample().item()
+
+            rot_dict = torch.distributions.Normal(mu[1], std[1])
+            _rot = rot_dict.sample().item()
+
+            actions.append([_vel, _rot])
+        return actions  # 返回动作值
+
+    def states2probs(self, states):
+        mu, std = self.actor(states)  # [b,1]
+        vel_dists = torch.distributions.Normal(mu[:, 0], std[:, 0])
+        rot_dists = torch.distributions.Normal(mu[:, 1], std[:, 1])
+        return vel_dists, rot_dists
 
     # 训练
     def update(self, transition_dict):
         # 提取数据集
-        states = torch.tensor(transition_dict['states'], dtype=torch.float).to(self.device)  # [b,n_states]
-        actions = torch.tensor(transition_dict['actions'], dtype=torch.float).view(-1, 1).to(self.device)  # [b,1]
-        rewards = torch.tensor(transition_dict['rewards'], dtype=torch.float).view(-1, 1).to(self.device)  # [b,1]
-        next_states = torch.tensor(transition_dict['next_states'], dtype=torch.float).to(self.device)  # [b,n_states]
-        dones = torch.tensor(transition_dict['dones'], dtype=torch.float).view(-1, 1).to(self.device)  # [b,1]
+        robot_num = len(transition_dict['states'][0])
+        advantages = []
+        old_log_probs = []
+        next_states_values_set = []
+        td_targets_set = []
 
-        # 价值网络--目标，获取下一时刻的state_value  [b,n_states]-->[b,1]
-        next_states_target = self.critic(next_states)
-        # 价值网络--目标，当前时刻的state_value  [b,1]
-        td_target = rewards + self.gamma * next_states_target * (1 - dones)
-        # 价值网络--预测，当前时刻的state_value  [b,n_states]-->[b,1]
-        td_value = self.critic(states)
-        # 时序差分，预测值-目标值  # [b,1]
-        td_delta = td_value - td_target
+        with torch.autograd.set_detect_anomaly(True):
+            for i in range(robot_num):
+                next_states = torch.tensor(transition_dict['next_states'], dtype=torch.float)[:, i].to(self.device)
+                rewards = torch.tensor(transition_dict['rewards'], dtype=torch.float)[:, i].view(-1, 1).to(self.device)
+                states = torch.tensor(transition_dict['states'], dtype=torch.float)[:, i].to(self.device)
+                actions = torch.tensor(transition_dict['actions'], dtype=torch.float)[:, i].to(self.device)
 
-        # 对时序差分结果计算GAE优势函数
-        td_delta = td_delta.cpu().detach().numpy()  # [b,1]
-        advantage_list = []  # 保存每个时刻的优势函数
-        advantage = 0  # 优势函数初始值
-        # 逆序遍历时序差分结果，把最后一时刻的放前面
-        for delta in td_delta[::-1]:
-            advantage = self.gamma * self.lmbda * advantage + delta
-            advantage_list.append(advantage)
-        # 正序排列优势函数
-        advantage_list.reverse()
-        # numpy --> tensor
-        advantage = torch.tensor(advantage_list, dtype=torch.float).to(self.device)
+                # 时序差分
+                next_states_values_set.append(self.critic(next_states))
+                current_state_values = self.critic(states)
+                td_targets_set.append(rewards + self.gamma * next_states_values_set[-1])
 
-        # 策略网络--预测，当前状态选择的动作的高斯分布
-        mu, std = self.actor(states)  # [b,1]
-        # 基于均值和标准差构造正态分布
-        action_dists = torch.distributions.Normal(mu.detch(), std.detch())
-        # 从正态分布中选择动作，并使用log函数
-        old_log_prob = action_dists.log_prob(actions)
+                delta = td_targets_set[-1] - current_state_values
+                delta = delta.cpu().detach().numpy()
 
-        # 一个序列训练epochs次
-        for _ in range(self.epochs):
-            # 预测当前状态下的动作
-            mu, std = self.actor(states)
-            # 构造正态分布
-            action_dists = torch.distributions.Normal(mu, std)
-            # 当前策略在 t 时刻智能体处于状态 s 所采取的行为概率
-            log_prob = action_dists.log_prob(actions)
-            # 计算概率的比值来控制新策略更新幅度
-            ratio = torch.exp(log_prob - old_log_prob)
+                # 计算优势函数
+                advantage = delta[0]  # 优势函数初始值
+                advantage_list = [advantage]
+                for delta in delta[1:]:
+                    advantage = advantage + self.gamma * self.lmbda * delta
+                    advantage_list.append(advantage)
+                advantages.append(torch.tensor(advantage_list, dtype=torch.float).to(self.device))
 
-            # 公式的左侧项
-            surr1 = ratio * advantage
-            # 公式的右侧项，截断
-            surr2 = torch.clamp(ratio, 1 - self.eps, 1 + self.eps)
+                # 保存旧策略下选取当前动作的概率
+                vel_dists, rot_dists = self.states2probs(states)
 
-            # 策略网络的损失PPO-clip
-            actor_loss = torch.mean(-torch.min(surr1, surr2))
-            # 价值网络的当前时刻预测值，与目标价值网络当前时刻的state_value之差
-            critic_loss = torch.mean(F.mse_loss(self.critic(states), td_target.detch()))
+                # 这里假定速度和角速度是独立同分布，所以log(a,b)=log(a)+log(b)
+                old_log_probs.append(vel_dists.log_prob(actions[:, 0]) + rot_dists.log_prob(actions[:, 1]))
 
-            # 优化器清0
-            self.actor_optimizer.zero_grad()
-            self.critic_optimizer.zero_grad()
-            # 梯度反传
-            actor_loss.backward()
-            critic_loss.backward()
-            # 参数更新
-            self.actor_optimizer.step()
-            self.critic_optimizer.step()
+            # 一个序列训练epochs次
+            for _ in range(self.epochs):
+                for i in range(robot_num):
+                    states = torch.tensor(transition_dict['states'], dtype=torch.float)[:, i].to(self.device)
+                    actions = torch.tensor(transition_dict['actions'], dtype=torch.float)[:, i].to(self.device)
+
+                    vel_dists, rot_dists = self.states2probs(states)
+
+                    # 当前策略在 t 时刻智能体处于状态 s 所采取的行为概率
+                    log_prob = vel_dists.log_prob(actions[:, 0]) + rot_dists.log_prob(actions[:, 1])
+
+                    ratio = torch.exp(log_prob - old_log_probs[i].detach())
+                    surr1 = ratio * advantages[i]
+                    surr2 = torch.clamp(ratio, 1 - self.eps, 1 + self.eps) * advantages[i]
+
+                    # 策略网络的损失PPO-clip
+                    actor_loss = torch.mean(-torch.min(surr1, surr2))
+                    self.actor_optimizer.zero_grad()
+                    actor_loss.backward()
+                    self.actor_optimizer.step()
+
+            for _ in range(self.epochs):
+                critic_loss = torch.tensor(0.0).to(self.device)
+                for i in range(robot_num):
+                    states = torch.tensor(transition_dict['states'], dtype=torch.float)[:, i].to(self.device)
+                    critic_loss = critic_loss + torch.mean(
+                        F.mse_loss(self.critic(states), td_targets_set[i].detach()))
+
+                self.critic_optimizer.zero_grad()
+                critic_loss.backward()
+                self.critic_optimizer.step()

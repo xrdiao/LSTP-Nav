@@ -49,12 +49,13 @@ class Robot(object):
         # obversation: laser1, ..., n, distance, alpha
         pos, ori = p.getBasePositionAndOrientation(self.robot)
         laser = self.ray_sensor()
-        return [laser, np.linalg.norm(np.array(pos)[:2] - self.target_pos)]
+        return laser + [np.linalg.norm(np.array(pos)[:2] - self.target_pos)]
 
     def apply_action(self, action):  # 施加动作
         if not (isinstance(action, list) or isinstance(action, np.ndarray)):
             assert f"apply_action() only receive list or ndarray, but receive {type(action)}"
-        left_v, right_v = action
+        _action = [MAX_SPEED * action[0], MAX_ROTATION_SPEED * action[1]]
+        left_v, right_v = self.action2commend(action)
 
         left_v = self.clipv(left_v)
         right_v = self.clipv(right_v)
@@ -141,3 +142,19 @@ class Robot(object):
         # p.setJointMotorControl2(self.robot, 0, p.VELOCITY_CONTROL, targetVelocity=leftWheelVelocity, force=10)
         # p.setJointMotorControl2(self.robot, 1, p.VELOCITY_CONTROL, targetVelocity=rightWheelVelocity, force=10)
         return [leftWheelVelocity, rightWheelVelocity]
+
+    def action2commend(self, action):
+        '''
+        :param action: [velocity, rotation]
+        :return: commend:[u_left, u_right]，两轮差速小车左右轮控制指令
+        '''
+        v, w = action[0], action[1]  # v是小车前进速度，w是小车角速度
+        if abs(w) < 1e-3:
+            u_left, u_right = v, v
+            return u_left, u_right
+
+        R = v / w
+        v_left = (R + ROBOT_WIDTH / 2) * w
+        v_right = (R - ROBOT_WIDTH / 2) * w
+
+        return v_left, v_right

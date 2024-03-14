@@ -2,7 +2,6 @@ from env_sim.my_env import MyEnv
 from rl.model import *
 import numpy as np
 
-
 device = torch.device('cuda') if torch.cuda.is_available() \
     else torch.device('cpu')
 
@@ -22,9 +21,10 @@ return_list = []  # 保存每个回合的return
 # ----------------------------------------- #
 
 env = MyEnv(render=False)
-goal = [0.5, 0]
-env.add_robot([0, 0, 0, 0, 0, 0, 1.5], goal)
-env.add_robot([0, 1.5, 0, 0, 0, 0, 1], goal)
+goal_1 = [0.5, 0]
+goal_2 = [0.5, 1]
+env.add_robot([0, 0, 0.01, 0, 0, 0, 1.5], goal_1)
+env.add_robot([0, 2, 0.01, 0, 0, 0, 1], goal_2)
 
 n_states = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
@@ -47,8 +47,8 @@ agent = PPO(n_states=n_states,  # 状态数
 
 for i in range(num_episodes):
     state = env.reset()  # 环境重置
-    done = False  # 任务完成的标记
-    episode_return = 0  # 累计每回合的reward
+    done = np.zeros_like(env.robots, dtype=bool)  # 任务完成的标记
+    episode_return = np.zeros(env.robots_num)  # 累计每回合的reward
 
     # 构造数据集，保存每个回合的状态数据
     transition_dict = {
@@ -59,9 +59,9 @@ for i in range(num_episodes):
         'dones': [],
     }
 
-    while not done:
+    while not done.all():
         action = agent.take_action(state)  # 动作选择
-        next_state, reward, done, _, _ = env.step(action)  # 环境更新
+        next_state, reward, done, _ = env.step(action)  # 环境更新
         # 保存每个时刻的状态\动作\...
         transition_dict['states'].append(state)
         transition_dict['actions'].append(action)
@@ -70,15 +70,14 @@ for i in range(num_episodes):
         transition_dict['dones'].append(done)
         # 更新状态
         state = next_state
-        # 累计回合奖励
-        episode_return += reward
 
-    # 保存每个回合的return
-    return_list.append(episode_return)
+        if env.step_num > 10:
+            break
+
+    # 保存每个回合的reward
+    return_list.append(np.sum(transition_dict['rewards'], axis=0))
     # 模型训练
-    agent.learn(transition_dict)
+    agent.update(transition_dict)
 
     # 打印回合信息
-    print(f'iter:{i}, return:{np.mean(return_list[-10:])}')
-
-
+    print(f'iter:{i}, return:{np.mean(return_list)}')
