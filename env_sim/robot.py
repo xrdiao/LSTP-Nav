@@ -44,12 +44,30 @@ class Robot(object):
     def get_id(self):
         return self
 
+    def __get_forward_vector(self):  # 获取机器人朝向的向量
+        _, baseOri = p.getBasePositionAndOrientation(self.robot)
+        matrix = p.getMatrixFromQuaternion(baseOri)
+        return [matrix[0], matrix[3], matrix[6]]
+
+    def __angle(self, v1, v2):
+        v1 = np.array(v1)
+        v2 = np.array(v2)
+        cosangle = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+        return np.arccos(cosangle)
+
     def get_observation(self):  # 根据目的地的坐标得到机器人目前的状态
         assert self.target_pos is not None, "the goal of robot %d is not initialized" % self.client_id
         # obversation: laser1, ..., n, distance, alpha
         pos, ori = p.getBasePositionAndOrientation(self.robot)
+        ori = p.getMatrixFromQuaternion(ori)
         laser = self.ray_sensor()
-        return laser + [np.linalg.norm(np.array(pos)[:2] - self.target_pos)]
+
+        angle = self.__angle(
+            v1=[ori[0], ori[3], ori[6]],
+            v2=[y - x for x, y in zip(pos, self.target_pos)] + [0.]
+        )
+
+        return laser + [np.linalg.norm(np.array(pos)[:2] - self.target_pos), angle]
 
     def apply_action(self, action):  # 施加动作
         if not (isinstance(action, list) or isinstance(action, np.ndarray)):

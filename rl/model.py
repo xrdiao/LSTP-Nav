@@ -39,7 +39,7 @@ class ValueNet(nn.Module):
 class PPO:
     def __init__(self, n_states, n_hiddens, n_actions,
                  actor_lr, critic_lr,
-                 lmbda, epochs, eps, gamma, device):
+                 lmbda, epochs, eps, gamma, device, if_retrain=False):
         # 实例化策略网络
         self.actor = PolicyNet(n_states, n_hiddens, n_actions).to(device)
         # 实例化价值网络
@@ -48,6 +48,11 @@ class PPO:
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
         # 价值网络的优化器
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=critic_lr)
+
+        if if_retrain:
+            print('retraining model')
+            self.actor.load_state_dict(torch.load('./model/actor.pth'))
+            self.critic.load_state_dict(torch.load('./model/critic.pth'))
 
         # 属性分配
         self.lmbda = lmbda  # GAE优势函数的缩放因子
@@ -97,10 +102,10 @@ class PPO:
 
         with torch.autograd.set_detect_anomaly(True):
             for i in range(robot_num):
-                next_states = torch.tensor(transition_dict['next_states'], dtype=torch.float)[:, i].to(self.device)
-                rewards = torch.tensor(transition_dict['rewards'], dtype=torch.float)[:, i].view(-1, 1).to(self.device)
-                states = torch.tensor(transition_dict['states'], dtype=torch.float)[:, i].to(self.device)
-                actions = torch.tensor(transition_dict['actions'], dtype=torch.float)[:, i].to(self.device)
+                next_states = torch.tensor(np.array(transition_dict['next_states']), dtype=torch.float)[:, i].to(self.device)
+                rewards = torch.tensor(np.array(transition_dict['rewards']), dtype=torch.float)[:, i].view(-1, 1).to(self.device)
+                states = torch.tensor(np.array(transition_dict['states']), dtype=torch.float)[:, i].to(self.device)
+                actions = torch.tensor(np.array(transition_dict['actions']), dtype=torch.float)[:, i].to(self.device)
 
                 # 时序差分
                 next_states_values_set.append(self.critic(next_states))

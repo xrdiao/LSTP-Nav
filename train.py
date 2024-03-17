@@ -1,3 +1,5 @@
+import torch
+
 from env_sim.my_env import MyEnv
 from rl.model import *
 import numpy as np
@@ -9,16 +11,12 @@ device = torch.device('cuda') if torch.cuda.is_available() \
 # 参数设置
 # ----------------------------------------- #
 
-num_episodes = 100  # 总迭代次数
+num_episodes = 1000  # 总迭代次数
 gamma = 0.9  # 折扣因子
 actor_lr = 1e-3  # 策略网络的学习率
 critic_lr = 1e-2  # 价值网络的学习率
 n_hiddens = 16  # 隐含层神经元个数
 return_list = []  # 保存每个回合的return
-
-# ----------------------------------------- #
-# 环境加载
-# ----------------------------------------- #
 
 env = MyEnv(render=False)
 goal_1 = [0.5, 0]
@@ -29,10 +27,6 @@ env.add_robot([0, 2, 0.01, 0, 0, 0, 1], goal_2)
 n_states = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
 
-# ----------------------------------------- #
-# 模型构建
-# ----------------------------------------- #
-
 agent = PPO(n_states=n_states,  # 状态数
             n_hiddens=n_hiddens,  # 隐含层数
             n_actions=n_actions,  # 动作数
@@ -42,9 +36,11 @@ agent = PPO(n_states=n_states,  # 状态数
             epochs=10,  # 一组序列训练的轮次
             eps=0.2,  # PPO中截断范围的参数
             gamma=gamma,  # 折扣因子
-            device=device
+            device=device,
+            if_retrain=False
             )
 
+print('training agent')
 for i in range(num_episodes):
     state = env.reset()  # 环境重置
     done = np.zeros_like(env.robots, dtype=bool)  # 任务完成的标记
@@ -71,7 +67,7 @@ for i in range(num_episodes):
         # 更新状态
         state = next_state
 
-        if env.step_num > 10:
+        if env.step_num > 10000:
             break
 
     # 保存每个回合的reward
@@ -81,3 +77,6 @@ for i in range(num_episodes):
 
     # 打印回合信息
     print(f'iter:{i}, return:{np.mean(return_list)}')
+
+torch.save(agent.actor.state_dict(), './model/actor.pth')
+torch.save(agent.critic.state_dict(), './model/critic.pth')

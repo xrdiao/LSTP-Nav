@@ -41,13 +41,6 @@ class MyEnv(gym.Env):
         self.LASER_LENGTH = LASER_LENGTH
         self.MAX_DISTANCE = MAX_DISTANCE
 
-        # # 读入各项参数
-        # for file in os.listdir("./data/config"):
-        #     param_path = os.path.join("./robot/config/", file)
-        #     param_dict = load(open(param_path, "r", encoding="utf-8"), Loader=Loader)
-        #     for key, value in param_dict.items():
-        #         setattr(self, key, value)
-
         # 动作空间: 左轮速度， 右轮速度
         self.action_space = spaces.Box(
             low=np.array([-self.TARGET_VELOCITY, -self.TARGET_VELOCITY], dtype=np.float32),
@@ -55,8 +48,8 @@ class MyEnv(gym.Env):
         )
         # 状态空间: laser1, ..., 5,   distance, alpha
         self.observation_space = spaces.Box(
-            low=np.array([0.] * self.LASER_NUM + [0.], dtype=np.float32),
-            high=np.array([self.LASER_LENGTH + 1] * self.LASER_NUM + [self.MAX_DISTANCE], dtype=np.float32),
+            low=np.array([0.] * self.LASER_NUM + [0., 0.], dtype=np.float32),
+            high=np.array([self.LASER_LENGTH + 1] * self.LASER_NUM + [self.MAX_DISTANCE, np.pi], dtype=np.float32),
         )
 
         self.init_state = []
@@ -93,6 +86,7 @@ class MyEnv(gym.Env):
 
             if self.checkCollision(_rob.robot):
                 rc = COLLISION_REWARD
+                self.collision_num += 1
                 _done[i] = True
             else:
                 rc = 0
@@ -118,7 +112,7 @@ class MyEnv(gym.Env):
         for i in range(self.robots_num):
             _states.append(self.robots[i].get_observation())
 
-        distances = [_state[-1] for _state in _states]
+        distances = [_state[-2] for _state in _states]
         _reward, _done = self.__reward_func(distances)
 
         #  更新上一个时刻的距目标点距离
@@ -192,27 +186,33 @@ def createBoundaries(length, width):
     for i in range(width):
         p.loadURDF("cube.urdf", [-1, i, 0.5])
         p.loadURDF("cube.urdf", [length, i, 0.5])
-    p.loadURDF("cube.urdf", [length, -1, 0.5])
-    p.loadURDF("cube.urdf", [length, width, 0.5])
-    p.loadURDF("cube.urdf", [-1, width, 0.5])
-    p.loadURDF("cube.urdf", [-1, -1, 0.5])
+        if abs(i - length / 2) < 2:
+            continue
+        p.loadURDF("cube.urdf", [length / 2, i, 0.5])
 
 
 if __name__ == "__main__":
     env = MyEnv(render=True)
     goal = [1, 0]
-    env.add_robot([0, 0, 0.01, 0, 0, 0, 1.5], goal, 'utils/data/turtlebot.urdf')
-    env.add_robot([0, 1.5, 0.01, 0, 0, 0, 1], goal, 'utils/data/turtlebot.urdf')
-    p.resetDebugVisualizerCamera(cameraDistance=3, cameraYaw=0, cameraPitch=-89.9,
-                                 cameraTargetPosition=[0, 0, 0])
-    # createBoundaries(10, 10)
+    env.add_robot([1, 0, 0.01, 0, 0, 0, 1], goal, 'utils/data/turtlebot.urdf')
+    env.add_robot([0, 0, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
+    env.add_robot([4, 6.5, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
+
+    env.add_robot([7.5, 1.5, 0.01, 0, 0, 1.5, 1], goal, 'utils/data/turtlebot.urdf')
+    env.add_robot([8, 1.5, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
+    env.add_robot([8, 7.5, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
+    env.add_robot([8, 5.5, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
+
+    p.resetDebugVisualizerCamera(cameraDistance=7, cameraYaw=0, cameraPitch=-89.9,
+                                 cameraTargetPosition=[5, 5, 0])
+    createBoundaries(10, 10)
     while True:
         velocity = []
         for rob in env.robots:
-            velocity.append(rob.goto(goal))
+            velocity.append([10.0, 0])
         states, reward, done, info = env.step(velocity)
-        print(reward)
+        # print(reward)
         time.sleep(1 / 240)
 
-        if done:
-            env.reset(urdf_path='utils/data/turtlebot.urdf')
+        # if done:
+        #     env.reset(urdf_path='utils/data/turtlebot.urdf')
