@@ -102,8 +102,10 @@ class PPO:
 
         with torch.autograd.set_detect_anomaly(True):
             for i in range(robot_num):
-                next_states = torch.tensor(np.array(transition_dict['next_states']), dtype=torch.float)[:, i].to(self.device)
-                rewards = torch.tensor(np.array(transition_dict['rewards']), dtype=torch.float)[:, i].view(-1, 1).to(self.device)
+                next_states = torch.tensor(np.array(transition_dict['next_states']), dtype=torch.float)[:, i].to(
+                    self.device)
+                rewards = torch.tensor(np.array(transition_dict['rewards']), dtype=torch.float)[:, i].view(-1, 1).to(
+                    self.device)
                 states = torch.tensor(np.array(transition_dict['states']), dtype=torch.float)[:, i].to(self.device)
                 actions = torch.tensor(np.array(transition_dict['actions']), dtype=torch.float)[:, i].to(self.device)
 
@@ -125,7 +127,6 @@ class PPO:
 
                 # 保存旧策略下选取当前动作的概率
                 vel_dists, rot_dists = self.states2probs(states)
-
                 # 这里假定速度和角速度是独立同分布，所以log(a,b)=log(a)+log(b)
                 old_log_probs.append(vel_dists.log_prob(actions[:, 0]) + rot_dists.log_prob(actions[:, 1]))
 

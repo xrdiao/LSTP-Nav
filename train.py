@@ -5,11 +5,7 @@ import numpy as np
 device = torch.device('cuda') if torch.cuda.is_available() \
     else torch.device('cpu')
 
-# ----------------------------------------- #
-# 参数设置
-# ----------------------------------------- #
-
-num_episodes = 1  # 总迭代次数
+num_episodes = 1000  # 总迭代次数
 gamma = 0.9  # 折扣因子
 actor_lr = 1e-3  # 策略网络的学习率
 critic_lr = 1e-2  # 价值网络的学习率
@@ -65,7 +61,7 @@ for i in range(num_episodes):
         # 更新状态
         state = next_state
 
-        if env.step_num > 1:
+        if env.step_num > 100:
             break
 
     # 保存每个回合的reward
