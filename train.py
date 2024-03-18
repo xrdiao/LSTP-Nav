@@ -9,14 +9,14 @@ num_episodes = 1000  # 总迭代次数
 gamma = 0.9  # 折扣因子
 actor_lr = 1e-3  # 策略网络的学习率
 critic_lr = 1e-2  # 价值网络的学习率
-n_hiddens = 16  # 隐含层神经元个数
+n_hiddens = 32  # 隐含层神经元个数
 return_list = []  # 保存每个回合的return
 
-env = MyEnv(render=False)
-goal_1 = [0.5, 0]
-goal_2 = [0.5, 1]
-env.add_robot([0, 0, 0.01, 0, 0, 0, 1.5], goal_1)
-env.add_robot([0, 2, 0.01, 0, 0, 0, 1], goal_2)
+env = MyEnv(render=True)
+robot_nums = 10
+for i in range(robot_nums):
+    goal = [i+0.5, 10]
+    env.add_robot([i, 0, 0.01, 0, 0, 0, 1.5], goal)
 
 n_states = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
@@ -31,6 +31,8 @@ agent = PPO(n_states=n_states,  # 状态数
             eps=0.2,  # PPO中截断范围的参数
             gamma=gamma,  # 折扣因子
             device=device,
+            embed_dim=32,
+            num_heads=8,
             if_retrain=False
             )
 
@@ -61,7 +63,7 @@ for i in range(num_episodes):
         # 更新状态
         state = next_state
 
-        if env.step_num > 100:
+        if env.step_num > 1000:
             break
 
     # 保存每个回合的reward

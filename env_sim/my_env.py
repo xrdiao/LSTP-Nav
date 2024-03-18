@@ -157,6 +157,9 @@ class MyEnv(gym.Env):
             _states.append(self.robots[i].get_observation())
         return np.array(_states)
 
+    def show_goal_point(self):
+        p.addUserDebugPoints([[_g[0], _g[1], 0.5] for _g in self.init_goal], [[1, 0, 0]] * self.robots_num, 10)
+
     def render(self, mode='human'):
         pass
 
@@ -193,19 +196,24 @@ def createBoundaries(length, width):
 
 if __name__ == "__main__":
     env = MyEnv(render=True)
-    goal = [1, 0]
-    env.add_robot([1, 0, 0.01, 0, 0, 0, 1], goal, 'utils/data/turtlebot.urdf')
-    env.add_robot([0, 0, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
-    env.add_robot([4, 6.5, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
-
-    env.add_robot([7.5, 1.5, 0.01, 0, 0, 1.5, 1], goal, 'utils/data/turtlebot.urdf')
-    env.add_robot([8, 1.5, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
-    env.add_robot([8, 7.5, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
-    env.add_robot([8, 5.5, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
+    robot_nums = 2
+    for i in range(robot_nums):
+        goal = [i, i]
+        env.add_robot([i, i / 2, 0.01, 0, 0, 0, 1.5], goal, 'utils/data/turtlebot.urdf')
+    env.show_goal_point()
+    # goal = [1, 0]
+    # env.add_robot([1, 0, 0.01, 0, 0, 0, 1], goal, 'utils/data/turtlebot.urdf')
+    # env.add_robot([0, 0, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
+    # env.add_robot([4, 6.5, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
+    #
+    # env.add_robot([7.5, 1.5, 0.01, 0, 0, 1.5, 1], goal, 'utils/data/turtlebot.urdf')
+    # env.add_robot([8, 1.5, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
+    # env.add_robot([8, 7.5, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
+    # env.add_robot([8, 5.5, 0.01, 0, 0, 1, 1], goal, 'utils/data/turtlebot.urdf')
 
     p.resetDebugVisualizerCamera(cameraDistance=7, cameraYaw=0, cameraPitch=-89.9,
                                  cameraTargetPosition=[5, 5, 0])
-    createBoundaries(10, 10)
+    # createBoundaries(10, 10)
     while True:
         velocity = []
         for rob in env.robots:

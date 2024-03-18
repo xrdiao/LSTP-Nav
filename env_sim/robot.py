@@ -61,11 +61,13 @@ class Robot(object):
         pos, ori = p.getBasePositionAndOrientation(self.robot)
         ori = p.getMatrixFromQuaternion(ori)
         laser = self.ray_sensor()
-
-        angle = self.__angle(
-            v1=[ori[0], ori[3], ori[6]],
-            v2=[y - x for x, y in zip(pos, self.target_pos)] + [0.]
-        )
+        if np.sum(np.abs(np.array(pos)[:2] - np.array(self.target_pos)), axis=0) < 1e-3:
+            angle = 0
+        else:
+            angle = self.__angle(
+                v1=[ori[0], ori[3], ori[6]],
+                v2=[y - x for x, y in zip(pos, self.target_pos)] + [0.]
+            )
 
         return laser + [np.linalg.norm(np.array(pos)[:2] - self.target_pos), angle]
 
@@ -73,7 +75,8 @@ class Robot(object):
         if not (isinstance(action, list) or isinstance(action, np.ndarray)):
             assert f"apply_action() only receive list or ndarray, but receive {type(action)}"
         _action = [MAX_SPEED * action[0], MAX_ROTATION_SPEED * action[1]]
-        left_v, right_v = self.action2commend(action)
+        print(_action)
+        left_v, right_v = self.action2commend(_action)
 
         left_v = self.clipv(left_v)
         right_v = self.clipv(right_v)

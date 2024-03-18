@@ -6,17 +6,29 @@ from torch.nn import functional as F
 
 
 class PolicyNet(nn.Module):
-    def __init__(self, n_states, n_hiddens, n_actions):
+    def __init__(self, n_states, n_hiddens, n_actions, embed_dim, num_heads):
         super(PolicyNet, self).__init__()
         self.fc1 = nn.Linear(n_states, n_hiddens)
+
         self.fc_mu = nn.Linear(n_hiddens, n_actions)
         self.fc_std = nn.Linear(n_hiddens, n_actions)
+
+        # self.att_goal = nn.MultiheadAttention(embed_dim, num_heads)
+        # self.Q_goal = nn.Linear(2, embed_dim)
+        # self.K_goal = nn.Linear(2, embed_dim)
+        # self.W_goal = nn.Linear(2, embed_dim)
+        #
+        # self.att_laser = nn.MultiheadAttention(embed_dim, num_heads)
+        # self.Q_laser = nn.Linear(n_states-2, embed_dim)
+        # self.K_laser = nn.Linear(n_states-2, embed_dim)
+        # self.W_laser = nn.Linear(n_states-2, embed_dim)
 
     # 前向传播
     def forward(self, x):
         x = self.fc1(x)  # [b, n_states] --> [b, n_hiddens]
         x = F.relu(x)
-        mu = self.fc_mu(x)  # [b, n_hiddens] --> [b, n_actions] mu=[velocity, rotational velocity] * robots_num
+        mu = self.fc_mu(x)
+        mu = F.sigmoid(mu)# [b, n_hiddens] --> [b, n_actions] mu=[velocity, rotational velocity] * robots_num
         std = self.fc_std(x)  # [b, n_hiddens] --> [b, n_actions]
         std = F.softplus(std)  # 值域 小于0的部分逼近0，大于0的部分几乎不变
         return mu, std
@@ -39,9 +51,9 @@ class ValueNet(nn.Module):
 class PPO:
     def __init__(self, n_states, n_hiddens, n_actions,
                  actor_lr, critic_lr,
-                 lmbda, epochs, eps, gamma, device, if_retrain=False):
+                 lmbda, epochs, eps, gamma, device, embed_dim, num_heads, if_retrain=False):
         # 实例化策略网络
-        self.actor = PolicyNet(n_states, n_hiddens, n_actions).to(device)
+        self.actor = PolicyNet(n_states, n_hiddens, n_actions, embed_dim, num_heads).to(device)
         # 实例化价值网络
         self.critic = ValueNet(n_states, n_hiddens).to(device)
         # 策略网络的优化器
