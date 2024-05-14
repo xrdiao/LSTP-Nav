@@ -28,21 +28,18 @@ class Robot(object):
         self.cur_dis = 0
 
     def reset(self):
-        self.robot = p.loadURDF(
-            fileName=self.urdf_path,
-            basePosition=self.init_pos,
-            baseOrientation=self.init_ori,
-            physicsClientId=self.client_id
-        )
+        p.resetBasePositionAndOrientation(self.robot, self.init_pos, self.init_ori, self.client_id)
 
     def set_target_pos(self, target_pos):
         self.target_pos = target_pos
 
-    def get_state(self):
-        return self.get_observation()
-
     def get_id(self):
         return self
+
+    def get_vel_and_pos(self):
+        vel, angular_vel = p.getBaseVelocity(self.robot, self.client_id)
+        pos, ori = p.getBasePositionAndOrientation(self.robot, self.client_id)
+        return dict(vel=vel, angular_vel=angular_vel, pos=pos, ori=ori)
 
     def __get_forward_vector(self):  # 获取机器人朝向的向量
         _, baseOri = p.getBasePositionAndOrientation(self.robot)
@@ -57,25 +54,23 @@ class Robot(object):
 
     def get_observation(self):  # 根据目的地的坐标得到机器人目前的状态
         assert self.target_pos is not None, "the goal of robot %d is not initialized" % self.client_id
-        # obversation: laser1, ..., n, distance, alpha
+        # obversation: laser1, ..., lasern, distance, alpha
         pos, ori = p.getBasePositionAndOrientation(self.robot)
-        ori = p.getMatrixFromQuaternion(ori)
+        # rot_matrix[0], rot_matrix[3]分别代表着cos(theta)和sin(theta)
+        rot_matrix = p.getMatrixFromQuaternion(ori)
         laser = self.ray_sensor()
-        if np.sum(np.abs(np.array(pos)[:2] - np.array(self.target_pos)), axis=0) < 1e-3:
-            angle = 0
-        else:
-            angle = self.__angle(
-                v1=[ori[0], ori[3], ori[6]],
-                v2=[y - x for x, y in zip(pos, self.target_pos)] + [0.]
-            )
 
-        return laser + [np.linalg.norm(np.array(pos)[:2] - self.target_pos), angle]
+        angle = self.__angle(
+                v1=[rot_matrix[0], rot_matrix[3]],
+                v2=[y - x for x, y in zip(pos[:2], self.target_pos)]
+        )
+        distance = np.linalg.norm(np.array(pos)[:2] - self.target_pos)
+        return dict(laser=laser, distance=[distance], angle=[angle])
 
     def apply_action(self, action):  # 施加动作
         if not (isinstance(action, list) or isinstance(action, np.ndarray)):
             assert f"apply_action() only receive list or ndarray, but receive {type(action)}"
-        _action = [MAX_SPEED * action[0], MAX_ROTATION_SPEED * action[1]]
-        print(_action)
+        _action = [action[0], action[1]]
         left_v, right_v = self.action2commend(_action)
 
         left_v = self.clipv(left_v)
@@ -90,6 +85,13 @@ class Robot(object):
         )
 
     def check_pos(self, Pos, goal, bias):
+        '''
+        check if the robot reaches the goal
+        :param Pos:
+        :param goal:
+        :param bias:
+        :return:
+        '''
         if goal[0] + bias > Pos[0] > goal[0] - bias and goal[1] + bias > Pos[1] > goal[1] - bias:
             return True
         else:
@@ -106,7 +108,7 @@ class Robot(object):
         _, _, yaw = p.getEulerFromQuaternion(ori)
         # 调整激光雷达安装位置
         start = list(start)
-        bia = 0.1
+        bia = 0.15
         start[2] += 0.1
         start[0] += bia * np.cos(yaw)
         start[1] += bia * np.sin(yaw)
@@ -158,24 +160,31 @@ class Robot(object):
         linear = k_linear * math.cos(theta)
         angular = k_angular * theta
 
-        rightWheelVelocity = linear + angular
-        leftWheelVelocity = linear - angular
+        # rightWheelVelocity = linear + angular
+        # leftWheelVelocity = linear - angular
         # p.setJointMotorControl2(self.robot, 0, p.VELOCITY_CONTROL, targetVelocity=leftWheelVelocity, force=10)
         # p.setJointMotorControl2(self.robot, 1, p.VELOCITY_CONTROL, targetVelocity=rightWheelVelocity, force=10)
-        return [leftWheelVelocity, rightWheelVelocity]
+        return [linear, angular]
 
     def action2commend(self, action):
         '''
-        :param action: [velocity, rotation]
+        :param action: [velocity, angular vel]
         :return: commend:[u_left, u_right]，两轮差速小车左右轮控制指令
         '''
         v, w = action[0], action[1]  # v是小车前进速度，w是小车角速度
-        if abs(w) < 1e-3:
-            u_left, u_right = v, v
-            return u_left, u_right
 
-        R = v / w
-        v_left = (R + ROBOT_WIDTH / 2) * w
-        v_right = (R - ROBOT_WIDTH / 2) * w
+        # R = v / w
+        # v_left = (R + ROBOT_WIDTH / 2) * w
+        # v_right = (R - ROBOT_WIDTH / 2) * w
+        v_left = v - w * ROBOT_WIDTH / 2.0
+        v_right = v + w * ROBOT_WIDTH / 2.0
 
         return v_left, v_right
+
+    def is_reachable(self):
+        pos, _ = p.getBasePositionAndOrientation(self.robot, self.client_id)
+        distance = [pos[i] - self.target_pos[i] for i in range(2)]
+        distance = np.linalg.norm(distance)
+        if distance < 0.1:
+            return True
+        return False

@@ -6,32 +6,31 @@ from torch.nn import functional as F
 
 
 class PolicyNet(nn.Module):
-    def __init__(self, n_states, n_hiddens, n_actions, embed_dim, num_heads):
+    def __init__(self, n_states, n_actions, embed_dim, num_heads):
         super(PolicyNet, self).__init__()
-        self.fc1 = nn.Linear(n_states, n_hiddens)
 
-        self.fc_mu = nn.Linear(n_hiddens, n_actions)
-        self.fc_std = nn.Linear(n_hiddens, n_actions)
+        self.Q_goal = nn.Linear(2, embed_dim)
+        self.K_laser = nn.Linear(n_states-2, embed_dim)
+        self.V_laser = nn.Linear(n_states-2, embed_dim)
+        self.att_laser = nn.MultiheadAttention(embed_dim, num_heads)
 
-        # self.att_goal = nn.MultiheadAttention(embed_dim, num_heads)
-        # self.Q_goal = nn.Linear(2, embed_dim)
-        # self.K_goal = nn.Linear(2, embed_dim)
-        # self.W_goal = nn.Linear(2, embed_dim)
-        #
-        # self.att_laser = nn.MultiheadAttention(embed_dim, num_heads)
-        # self.Q_laser = nn.Linear(n_states-2, embed_dim)
-        # self.K_laser = nn.Linear(n_states-2, embed_dim)
-        # self.W_laser = nn.Linear(n_states-2, embed_dim)
+        self.fc_mu = nn.Linear(embed_dim, n_actions)
+        self.fc_std = nn.Linear(embed_dim, n_actions)
 
     # 前向传播
     def forward(self, x):
-        x = self.fc1(x)  # [b, n_states] --> [b, n_hiddens]
-        x = F.relu(x)
-        mu = self.fc_mu(x)
-        mu = F.sigmoid(mu)# [b, n_hiddens] --> [b, n_actions] mu=[velocity, rotational velocity] * robots_num
-        std = self.fc_std(x)  # [b, n_hiddens] --> [b, n_actions]
+        laser_info, goal = x[:,:-2], x[:,-2:]
+        goal_q = self.Q_goal(goal)
+        laser_k = self.K_laser(laser_info)
+        laser_v = self.V_laser(laser_info)
+        laser_embedding, _ = self.att_laser(goal_q, laser_k, laser_v)
+
+        laser_embedding = F.relu(laser_embedding)
+        mu = self.fc_mu(laser_embedding)
+        mu = F.sigmoid(mu)  # [b, n_hiddens] --> [b, n_actions] mu=[velocity, rotational velocity] * robots_num
+        std = self.fc_std(laser_embedding)  # [b, n_hiddens] --> [b, n_actions]
         std = F.softplus(std)  # 值域 小于0的部分逼近0，大于0的部分几乎不变
-        return mu, std
+        return mu.squeeze(0), std.squeeze(0)
 
 
 class ValueNet(nn.Module):
@@ -53,7 +52,7 @@ class PPO:
                  actor_lr, critic_lr,
                  lmbda, epochs, eps, gamma, device, embed_dim, num_heads, if_retrain=False):
         # 实例化策略网络
-        self.actor = PolicyNet(n_states, n_hiddens, n_actions, embed_dim, num_heads).to(device)
+        self.actor = PolicyNet(n_states, n_actions, embed_dim, num_heads).to(device)
         # 实例化价值网络
         self.critic = ValueNet(n_states, n_hiddens).to(device)
         # 策略网络的优化器
@@ -85,7 +84,7 @@ class PPO:
         robots_num = len(states)
         actions = []
         for i in range(robots_num):
-            state = torch.tensor(states[i], dtype=torch.float).to(self.device)
+            state = torch.tensor(states[i], dtype=torch.float).to(self.device).unsqueeze(0)
             mu, std = self.actor(state)  # 预测下一个动作
 
             vel_dict = torch.distributions.Normal(mu[0], std[0])
@@ -147,7 +146,6 @@ class PPO:
                 for i in range(robot_num):
                     states = torch.tensor(transition_dict['states'], dtype=torch.float)[:, i].to(self.device)
                     actions = torch.tensor(transition_dict['actions'], dtype=torch.float)[:, i].to(self.device)
-
                     vel_dists, rot_dists = self.states2probs(states)
 
                     # 当前策略在 t 时刻智能体处于状态 s 所采取的行为概率
