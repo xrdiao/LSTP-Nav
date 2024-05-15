@@ -14,12 +14,11 @@ from env_sim.argument import *
 
 
 class MyEnv(gym.Env):
-    metadata = {'render.modes': ['human']}
-
     def __init__(self, scene_name: str = "plane_static_obstacle-A", render: bool = False, evaluate: bool = False):
         self.time_step = 1. / 240.
 
-        self._physics_client_id = p.connect(p.GUI if render else p.DIRECT)
+        self.random_mode = render
+        self._physics_client_id = p.connect(p.GUI if self.random_mode else p.DIRECT)
         p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
         p.setGravity(0., 0., -9.8, physicsClientId=self._physics_client_id)
         p.setRealTimeSimulation(0)  # 1表示随着真实时间仿真，0表示要用p.step()进行步进
@@ -78,26 +77,27 @@ class MyEnv(gym.Env):
         '''
         done = False
         while not done:
-            pos = np.random.uniform(low=-lim, high=lim, size=2)
-            pos = pos.tolist() + [0.01]
+            pos = np.random.uniform(low=-lim, high=lim, size=2).tolist() + [0.01]
             angle = np.random.uniform(low=-np.pi, high=np.pi)
             ori = list(p.getQuaternionFromEuler([0, 0, angle], self._physics_client_id))
 
+            done = True
             # 判断随机放置的机器人是否会与已有机器人发生碰撞
             for state in self.init_state:
-                if self.__distance(state[:2], pos[:2]) > 3 * ROBOT_WIDTH:
-                    done = True
+                done = True and done if self.__distance(state[:2], pos[:2]) > 2.5 * ROBOT_WIDTH else False and done
+
             if self.robots_num == 0:
-                done = True
+                break
 
         done = False
         while not done:
             goal = np.random.uniform(low=-lim, high=lim, size=2)
+            done = True
             for state in self.init_goal:
-                if self.__distance(state[:2], goal[:2]) > 2 * ROBOT_WIDTH:
-                    done = True
+                done = True and done if self.__distance(state[:2], goal[:2]) > 2.5 * ROBOT_WIDTH else False and done
+
             if self.robots_num == 0:
-                done = True
+                break
 
         robot = Robot(base_pos=pos, base_ori=ori, client_id=self._physics_client_id, urdf_path=updf_path)
         robot.set_target_pos(goal)
@@ -177,6 +177,28 @@ class MyEnv(gym.Env):
         _info = {"distance": distances, "collision_num": self.collision_num}
         return np.array(current_state), reward, te, tr, _info
 
+    def reset_robot(self, idx: int, lim: int = 5):
+        '''
+        Reset the position of the robot
+        '''
+        if lim:
+            done = False
+            while not done:
+                pos = np.random.uniform(low=-lim, high=lim, size=2).tolist() + [0.01]
+                angle = np.random.uniform(low=-np.pi, high=np.pi)
+                ori = list(p.getQuaternionFromEuler([0, 0, angle], self._physics_client_id))
+
+                # 判断随机放置的机器人是否会与已有机器人发生碰撞
+                done = True
+                for rob in self.robots:
+                    state = rob.get_vel_and_pos()['pos']
+                    done = True and done if self.__distance(state[:2], pos[:2]) > 2.5 * ROBOT_WIDTH else False and done
+
+        else:
+            pos, ori = self.init_state[:3], self.init_state[3:]
+
+        p.resetBasePositionAndOrientation(self.robots[idx].robot, pos, ori, self._physics_client_id)
+
     def reset(self, phase='train', test_case=None, urdf_path='utils/data/turtlebot.urdf', tr: list = None,
               lim=0):
         """
@@ -194,7 +216,15 @@ class MyEnv(gym.Env):
         if local_reset:
             assert len(tr) == self.robots_num
             for idx in reset_id:
-                self.robots[idx].reset()
+                self.reset_robot(idx, lim=lim)
+
+            current_state = []
+            for i in range(self.robots_num):
+                obs = self.robots[i].get_observation()
+                laser = obs['laser']
+                distance = obs['distance']
+                angle = obs['angle']
+                current_state.append(laser + distance + angle)
 
         else:
             # reset scene
@@ -236,7 +266,7 @@ class MyEnv(gym.Env):
                 current_state.append(laser + distance + angle)
 
             self.show_goal_point()
-            return np.array(current_state), ''
+        return np.array(current_state), dict()
 
     def show_goal_point(self):
         p.addUserDebugPoints([[_g[0], _g[1], 0.5] for _g in self.init_goal], [[1, 0, 0]] * self.robots_num, 10)
@@ -287,8 +317,10 @@ def createBoundaries(length, width):
 
 def main():
     env = MyEnv(render=True)
+    # env = gym.make('MyEnv-v0')
+
     robot_nums = 3
-    lim = 1
+    lim = 5
 
     for i in range(robot_nums):
         goal = [0, 1 + i]
@@ -304,13 +336,15 @@ def main():
                                  cameraTargetPosition=[0, 0, 0])
     # createBoundaries(10, 10)
 
+    # env.reset()
+
     velocity = np.zeros([env.robots_num, 2])
     while True:
         for i, rob in enumerate(env.robots):
             vel = rob.goto(rob.target_pos)
             velocity[i] = vel
         states, reward, te, tr, info = env.step(velocity)
-        # print(reward, te, tr)
+        # print(states)
         # time.sleep(1 / 240)
 
         done_te = True
@@ -324,8 +358,11 @@ def main():
                 break
 
         if done_te or done_tr:
-            env.reset(urdf_path='utils/data/turtlebot.urdf', lim=lim, tr=tr)
+            a, _ = env.reset(urdf_path='utils/data/turtlebot.urdf', lim=lim, tr=tr)
+            # print('reset state', a)
 
 
 if __name__ == '__main__':
+    # env_ = gym.make('MyEnv-v0')
     main()
+    # print(1)

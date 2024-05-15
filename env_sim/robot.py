@@ -28,6 +28,7 @@ class Robot(object):
         self.cur_dis = 0
 
     def reset(self):
+        # reset可能会导致有些机器人直接被卡住，所以随机reset吧
         p.resetBasePositionAndOrientation(self.robot, self.init_pos, self.init_ori, self.client_id)
 
     def set_target_pos(self, target_pos):
