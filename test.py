@@ -1,47 +1,72 @@
 from env_sim.my_env import MyEnv
 from rl.model import *
 import numpy as np
+import gymnasium as gym
+import os
+import pybullet as p
+
+base_path = os.path.dirname(os.path.abspath(__file__))
+urdf_path = base_path + '/env_sim/utils/data/turtlebot.urdf'
 
 device = torch.device('cuda') if torch.cuda.is_available() \
     else torch.device('cpu')
 
-# ----------------------------------------- #
-# 参数设置
-# ----------------------------------------- #
 
-num_episodes = 1000  # 总迭代次数
-gamma = 0.9  # 折扣因子
-actor_lr = 1e-3  # 策略网络的学习率
-critic_lr = 1e-2  # 价值网络的学习率
-n_hiddens = 16  # 隐含层神经元个数
-return_list = []  # 保存每个回合的return
+def test():
+    render = True
+    env = gym.make('MyEnv-v0', render=render, urdf_path=urdf_path)
+    p.resetDebugVisualizerCamera(cameraDistance=3, cameraYaw=0, cameraPitch=-89.9,
+                                 cameraTargetPosition=[0, 0, 0])
 
-env = MyEnv(render=True)
-goal_1 = [0.5, 0]
-goal_2 = [0.5, 1]
-env.add_robot([0, 0, 0.01, 0, 0, 0, 1.5], goal_1)
-env.add_robot([0, 2, 0.01, 0, 0, 0, 1], goal_2)
+    robot_nums = 2
+    lim = 5
 
-n_states = env.observation_space.shape[0]
-n_actions = env.action_space.shape[0]
+    print('robot_nums:', robot_nums)
+    for i in range(robot_nums):
+        env.add_random_robot(lim=lim)
 
-agent = PPO(n_states=n_states,  # 状态数
-            n_hiddens=n_hiddens,  # 隐含层数
-            n_actions=n_actions,  # 动作数
-            actor_lr=actor_lr,  # 策略网络学习率
-            critic_lr=critic_lr,  # 价值网络学习率
-            lmbda=0.95,  # 优势函数的缩放因子
-            epochs=10,  # 一组序列训练的轮次
-            eps=0.2,  # PPO中截断范围的参数
-            gamma=gamma,  # 折扣因子
-            device=device,
-            if_retrain=True
-            )
+    agent = PPO(env, test_env=env)
+    rewards = []
+    action = np.zeros([env.robots_num, 2])
+    next_obs, _ = env.reset()
 
-state = env.reset()  # 环境重置
+    # 只收集了一个机器人的rewards
+    with torch.no_grad():
+        for times in range(3):
+            print('times:', times)
+            r = []
 
-done = np.zeros_like(env.robots, dtype=bool)
-while not done.all():
-    action = agent.take_action(state)  # 动作选择
-    next_state, reward, done, _ = env.step(action)  # 环境更新
-    state = next_state
+            while True:
+                for i, rob in enumerate(env.robots):
+                    vel = rob.goto(rob.target_pos)
+                    action[i] = vel
+
+                next_obs, reward, te, tr, info_ = env.step(action)
+                r.append(reward)
+                done = agent.check_done(te=te, tr=tr)
+
+                if np.array(done).all():
+                    rewards.append(np.sum(np.array(r), axis=0))
+                    break
+
+        print('rewards:', rewards)
+
+
+def main():
+    render = True
+    env = gym.make('MyEnv-v0', render=render, urdf_path=urdf_path)
+
+    robot_nums = 2
+    lim = 5
+
+    print('robot_nums:', robot_nums)
+    for i in range(robot_nums):
+        env.add_random_robot(lim=lim)
+
+    agent = PPO(env, test_env=env)
+    agent.evaluate(steps=100000)
+
+
+if __name__ == '__main__':
+    main()
+    # test()

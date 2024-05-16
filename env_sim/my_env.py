@@ -1,5 +1,7 @@
 import sys
 import os
+from typing import Optional, Dict, Any
+
 import gymnasium as gym
 import pybullet as p
 import pybullet_data
@@ -7,14 +9,21 @@ import numpy as np
 from gymnasium import spaces
 import time
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(BASE_DIR)
+# path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# path = sys.path[0] + '\\env_sim'
+# sys.path.append(path)
+
 from env_sim.robot import Robot
 from env_sim.argument import *
 
+import warnings
+
+warnings.filterwarnings("ignore")
+
 
 class MyEnv(gym.Env):
-    def __init__(self, scene_name: str = "plane_static_obstacle-A", render: bool = False, evaluate: bool = False):
+    def __init__(self, scene_name: str = "plane_static_obstacle-A", render: bool = False, evaluate: bool = False,
+                 urdf_path: Optional[str] = 'utils/data/turtlebot.urdf'):
         self.time_step = 1. / 240.
 
         self.random_mode = render
@@ -34,6 +43,7 @@ class MyEnv(gym.Env):
         self.collision_num = 0
 
         self.robots_num = 0
+        self.urdf_path = urdf_path
         self.TARGET_VELOCITY = TARGET_VELOCITY
         self.LASER_NUM = LASER_NUM
         self.LASER_LENGTH = LASER_LENGTH
@@ -53,7 +63,7 @@ class MyEnv(gym.Env):
         self.init_state = []
         self.init_goal = []
 
-    def add_robot(self, state, goal=None, urdf_path='utils/data/turtlebot.urdf'):
+    def add_robot(self, state, goal=None):
         if goal is None:
             goal = [0, 0]
         assert len(state) == 7, 'state must have 7 elements, [pos, ori]'
@@ -62,7 +72,8 @@ class MyEnv(gym.Env):
                                    _state[:2]) > 2 * ROBOT_WIDTH, 'the robot with id={} is incorrect'.format(
                 self.robots_num)
 
-        robot = Robot(base_pos=state[:3], base_ori=state[3:], client_id=self._physics_client_id, urdf_path=urdf_path)
+        robot = Robot(base_pos=state[:3], base_ori=state[3:], client_id=self._physics_client_id,
+                      urdf_path=self.urdf_path)
         robot.set_target_pos(goal)
         robot.cur_dis = self.__distance(np.array(state[:2]), np.array(goal[:2]))
         self.robots.append(robot)
@@ -70,7 +81,7 @@ class MyEnv(gym.Env):
         self.init_state.append(state)
         self.init_goal.append(goal)
 
-    def add_random_robot(self, lim=1, updf_path='utils/data/turtlebot.urdf'):
+    def add_random_robot(self, lim=1):
         '''
         Add a random robot to the environment
         :param lim: The range limit of the robot positions
@@ -99,7 +110,7 @@ class MyEnv(gym.Env):
             if self.robots_num == 0:
                 break
 
-        robot = Robot(base_pos=pos, base_ori=ori, client_id=self._physics_client_id, urdf_path=updf_path)
+        robot = Robot(base_pos=pos, base_ori=ori, client_id=self._physics_client_id, urdf_path=self.urdf_path)
         robot.set_target_pos(goal)
         robot.cur_dis = self.__distance(np.array(pos[:2]), np.array(goal[:2]))
 
@@ -109,7 +120,7 @@ class MyEnv(gym.Env):
         self.init_state.append(state)
         self.init_goal.append(goal)
 
-    def checkCollision(self, robot_id, debug=False):
+    def checkCollision(self, robot_id, debug=True):
         # 也可以用距离判断
         if p.getContactPoints(bodyA=robot_id, linkIndexA=-1, physicsClientId=self._physics_client_id):
             if debug:
@@ -121,13 +132,25 @@ class MyEnv(gym.Env):
         rewards = []
         # terminated表示智能体是否到达终点，truncated表示智能体因时间或物理碰撞等因素停止运行
         te, tr = np.zeros_like(self.robots, dtype=bool), np.zeros_like(self.robots, dtype=bool)
+
         for i, rob in enumerate(self.robots):
+            obs_dict = rob.get_vel_and_pos()
+            angular_speed = obs_dict['angular_vel']
+
+            # 到达目标点奖励
             if rob.is_reachable():
-                rg = ARRIVAL_REWARD
                 te[i] = True
+                if not rob.reach_goal:
+                    rg = ARRIVAL_REWARD
+                    rob.reach_goal = True
+                else:
+                    rg = 0
+            # 距离目标点距离奖励
             else:
                 rg = DISTANCE_REWARD_WEIGHT * (rob.cur_dis.item() - distances[i])
+                rob.reach_goal = False
 
+            # 碰撞时惩罚
             if self.checkCollision(rob.robot):
                 rc = COLLISION_REWARD
                 self.collision_num += 1
@@ -135,7 +158,9 @@ class MyEnv(gym.Env):
             else:
                 rc = 0
 
-            rewards.append(rg + rc)
+            # 过大角速度时惩罚
+            rw = ANGULAR_VELOCITY_PENALTY * abs(angular_speed) if abs(angular_speed) > 0.7 else 0
+            rewards.append(rg + rc + rw)
 
         return rewards, te, tr
 
@@ -199,26 +224,32 @@ class MyEnv(gym.Env):
 
         p.resetBasePositionAndOrientation(self.robots[idx].robot, pos, ori, self._physics_client_id)
 
-    def reset(self, phase='train', test_case=None, urdf_path='utils/data/turtlebot.urdf', tr: list = None,
-              lim=0):
+    def reset(self, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None, phase='train', test_case=None,
+              tr: list = None, te: list = None, lim=0):
         """
             - reset scene items
             - reload robot
         """
-
         assert self.robots is not None, 'no robots loaded'
+
+        te_done = True
+        if te is not None:
+            for d in te:
+                te_done = d and te_done
+
         local_reset = False
         if tr is not None:
             reset_id = np.where(tr == 1)[0]
             if len(reset_id) > 0:
                 local_reset = True
 
+        current_state = []
+
         if local_reset:
             assert len(tr) == self.robots_num
             for idx in reset_id:
                 self.reset_robot(idx, lim=lim)
 
-            current_state = []
             for i in range(self.robots_num):
                 obs = self.robots[i].get_observation()
                 laser = obs['laser']
@@ -226,7 +257,7 @@ class MyEnv(gym.Env):
                 angle = obs['angle']
                 current_state.append(laser + distance + angle)
 
-        else:
+        elif te_done:
             # reset scene
             p.resetSimulation(physicsClientId=self._physics_client_id)
             p.setGravity(0., 0., -9.8, physicsClientId=self._physics_client_id)
@@ -257,7 +288,6 @@ class MyEnv(gym.Env):
                     pos, ori = init_state[i][:3], init_state[i][3:]
                     self.add_robot(pos + ori, init_goal[i])
 
-            current_state = []
             for i in range(robot_num):
                 obs = self.robots[i].get_observation()
                 laser = obs['laser']
@@ -316,27 +346,27 @@ def createBoundaries(length, width):
 
 
 def main():
-    env = MyEnv(render=True)
-    # env = gym.make('MyEnv-v0')
+    # env = MyEnv(render=True)
+    env = gym.make('MyEnv-v0', render=True)
 
-    robot_nums = 3
+    robot_nums = 2
     lim = 5
 
     for i in range(robot_nums):
-        goal = [0, 1 + i]
+        goal = [i, 1 + i]
 
-        yaw = np.pi * i / robot_nums
+        yaw = np.pi * robot_nums
         ori = p.getQuaternionFromEuler([0, 0, yaw], env.physics_client_id)
         state = [i, 0, 0.01] + list(ori)
-        # env.add_robot(state, goal, 'utils/data/turtlebot.urdf')
-        env.add_random_robot(lim=lim)
+        env.add_robot(state, goal)
+        # env.add_random_robot(lim=lim)
     env.show_goal_point()
 
     p.resetDebugVisualizerCamera(cameraDistance=3, cameraYaw=0, cameraPitch=-89.9,
                                  cameraTargetPosition=[0, 0, 0])
     # createBoundaries(10, 10)
 
-    # env.reset()
+    env.reset()
 
     velocity = np.zeros([env.robots_num, 2])
     while True:
@@ -344,7 +374,7 @@ def main():
             vel = rob.goto(rob.target_pos)
             velocity[i] = vel
         states, reward, te, tr, info = env.step(velocity)
-        # print(states)
+        print(states)
         # time.sleep(1 / 240)
 
         done_te = True
@@ -358,7 +388,7 @@ def main():
                 break
 
         if done_te or done_tr:
-            a, _ = env.reset(urdf_path='utils/data/turtlebot.urdf', lim=lim, tr=tr)
+            a, _ = env.reset(lim=lim, tr=tr, te=te)
             # print('reset state', a)
 
 

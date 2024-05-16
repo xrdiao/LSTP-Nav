@@ -26,6 +26,7 @@ class Robot(object):
         self.last_state = base_pos + base_ori
         self.clipv = partial(np.clip, a_min=-MAX_SPEED, a_max=MAX_SPEED)
         self.cur_dis = 0
+        self.reach_goal = False
 
     def reset(self):
         # reset可能会导致有些机器人直接被卡住，所以随机reset吧
@@ -40,7 +41,7 @@ class Robot(object):
     def get_vel_and_pos(self):
         vel, angular_vel = p.getBaseVelocity(self.robot, self.client_id)
         pos, ori = p.getBasePositionAndOrientation(self.robot, self.client_id)
-        return dict(vel=vel, angular_vel=angular_vel, pos=pos, ori=ori)
+        return dict(vel=vel[:2], angular_vel=angular_vel[-1], pos=pos, ori=ori)
 
     def __get_forward_vector(self):  # 获取机器人朝向的向量
         _, baseOri = p.getBasePositionAndOrientation(self.robot)
