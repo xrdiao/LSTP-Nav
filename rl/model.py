@@ -29,7 +29,7 @@ class PPO:
         if test_env is not None:
             self.test_env = test_env
 
-    def evaluate(self, steps: int = 5000, times: int = 3):
+    def evaluate(self, steps: int = 5000, times: int = 3, lim: int = 5):
         assert self.test_env is not None, "Please input a test environment"
 
         rewards = []
@@ -44,7 +44,7 @@ class PPO:
 
                     next_obs, reward, te, tr, info_ = self.test_env.step(action.cpu().numpy())
                     r.append(reward)
-                    done = self.check_done(te=te, tr=tr)
+                    done = self.check_done(te=te, tr=tr, lim=lim)
 
                     if np.array(done).all() or step == steps - 1:
                         rewards.append(np.sum(np.array(r), axis=0))
@@ -76,7 +76,7 @@ class PPO:
         self.agent.load_state_dict(torch.load('agent.pth'))
 
     # 训练
-    def update(self, FPS=5):
+    def update(self, FPS=5, lim=5):
 
         run_name = f"{self.args.gym_id}__{self.args.exp_name}"
         self.robots_num = self.env.robots_num
@@ -136,7 +136,7 @@ class PPO:
 
                 # TRY NOT TO MODIFY: execute the game and log data.
                 next_obs, reward, te, tr, info = self.env.step(action.cpu().numpy(), FPS=FPS)
-                done = self.check_done(te=te, tr=tr)
+                done = self.check_done(te=te, tr=tr, lim=lim)
                 rewards[step] = torch.tensor(reward).to(self.device).view(-1)
                 next_obs, next_done = torch.Tensor(next_obs).to(self.device), torch.Tensor(done).to(self.device)
 
@@ -248,7 +248,7 @@ class PPO:
                 "bestTestReward": f'{max_reward:.2f}'
             })
 
-            test_reward = self.evaluate()
+            test_reward = self.evaluate(lim=lim)
             writer.add_scalar("rewards/test rewards", test_reward, global_step)
             writer.add_scalar("rewards/train rewards", train_reward, global_step)
 

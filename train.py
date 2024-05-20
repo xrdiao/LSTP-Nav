@@ -32,7 +32,7 @@ def main():
         p.resetDebugVisualizerCamera(cameraDistance=3, cameraYaw=0, cameraPitch=-89.9,
                                      cameraTargetPosition=[0, 0, 0])
     print('start train 1')
-    agent.update()
+    agent.update(lim=lim)
 
 
 if __name__ == '__main__':
