@@ -24,9 +24,18 @@ class Robot(object):
         self.init_pos = base_pos
         self.init_ori = base_ori
         self.last_state = base_pos + base_ori
-        self.clipv = partial(np.clip, a_min=-MAX_SPEED, a_max=MAX_SPEED)
-        self.cur_dis = 0
+        self.clipv = partial(np.clip, a_min=-MAX_SPEED / ROBOT_WHEEL_RADIUS, a_max=MAX_SPEED / ROBOT_WHEEL_RADIUS)
         self.reach_goal = False
+
+        # 用于记录上一时刻的数据，其中acceleration是标量
+        self.cur_dis = 0
+        self.cur_pos = None
+        self.cur_acc = None
+        self.cur_vel = None
+        self.cur_action = np.zeros(2)
+
+        # 记录动作的变化
+        self.del_action = None
 
     def reset(self):
         # reset可能会导致有些机器人直接被卡住，所以随机reset吧
@@ -41,10 +50,10 @@ class Robot(object):
     def get_vel_and_pos(self):
         vel, angular_vel = p.getBaseVelocity(self.robot, self.client_id)
         pos, ori = p.getBasePositionAndOrientation(self.robot, self.client_id)
-        return dict(vel=vel[:2], angular_vel=angular_vel[-1], pos=pos, ori=ori)
+        return dict(vel=vel[:2], angular_vel=angular_vel[-1], pos=pos, ori=ori, acc=self.cur_acc)
 
     def __get_forward_vector(self):  # 获取机器人朝向的向量
-        _, baseOri = p.getBasePositionAndOrientation(self.robot)
+        _, baseOri = p.getBasePositionAndOrientation(self.robot, self.client_id)
         matrix = p.getMatrixFromQuaternion(baseOri)
         return [matrix[0], matrix[3], matrix[6]]
 
@@ -56,15 +65,30 @@ class Robot(object):
 
     def get_observation(self):  # 根据目的地的坐标得到机器人目前的状态
         assert self.target_pos is not None, "the goal of robot %d is not initialized" % self.client_id
+
         # obversation: laser1, ..., lasern, distance, alpha
-        pos, ori = p.getBasePositionAndOrientation(self.robot)
-        # rot_matrix[0], rot_matrix[3]分别代表着cos(theta)和sin(theta)
-        rot_matrix = p.getMatrixFromQuaternion(ori)
-        laser = self.ray_sensor()
+        obs_dict = self.get_vel_and_pos()
+        # 观测时同时更新当前时刻 （t） 机器人的位置，t 时刻的位置要用于计算 t 时刻距终点的距离
+        vel, angular_vel, pos, ori = obs_dict['vel'], obs_dict['angular_vel'], obs_dict['pos'], obs_dict['ori']
+
+        vel = np.array(vel)
+        if self.cur_vel is None:
+            self.cur_acc = np.linalg.norm(vel)
+        else:
+            self.cur_acc = np.linalg.norm(vel - self.cur_vel)
+
+        self.cur_pos = list(pos)
+        # print('cur_vel:{}, vel:{}, cur_acc:{}, pos:{}, del_action:{}'.format(self.cur_vel, vel, self.cur_acc,
+        # self.cur_pos, self.del_action))
+
+        self.cur_vel = vel
+        rot_matrix = p.getMatrixFromQuaternion(ori)  # rot_matrix[0], rot_matrix[3]分别代表着cos(theta)和sin(theta)
+        # laser = self.ray_sensor()
+        laser = []  # 暂时不考虑雷达
 
         angle = self.__angle(
-                v1=[rot_matrix[0], rot_matrix[3]],
-                v2=[y - x for x, y in zip(pos[:2], self.target_pos)]
+            v1=[rot_matrix[0], rot_matrix[3]],
+            v2=[y - x for x, y in zip(pos[:2], self.target_pos)]
         )
         distance = np.linalg.norm(np.array(pos)[:2] - self.target_pos)
         return dict(laser=laser, distance=[distance], angle=[angle])
@@ -72,8 +96,8 @@ class Robot(object):
     def apply_action(self, action):  # 施加动作
         if not (isinstance(action, list) or isinstance(action, np.ndarray)):
             assert f"apply_action() only receive list or ndarray, but receive {type(action)}"
-        _action = [action[0], action[1]]
-        left_v, right_v = self.action2commend(_action)
+        self.cur_action = action.copy()
+        left_v, right_v = self.action2commend(self.cur_action)
 
         left_v = self.clipv(left_v)
         right_v = self.clipv(right_v)
@@ -83,7 +107,8 @@ class Robot(object):
             jointIndices=[0, 1],
             controlMode=p.VELOCITY_CONTROL,
             targetVelocities=[left_v, right_v],
-            forces=[10, 10]
+            forces=[10, 10],
+            physicsClientId=self.client_id
         )
 
     def check_pos(self, Pos, goal, bias):
@@ -106,7 +131,7 @@ class Robot(object):
         rayLength = LASER_LENGTH  # 射线长度
         rayNum = LASER_NUM  # 射线数量
 
-        start, ori = p.getBasePositionAndOrientation(self.robot)  # 射线从躯干射出
+        start, ori = p.getBasePositionAndOrientation(self.robot, self.client_id)  # 射线从躯干射出
         _, _, yaw = p.getEulerFromQuaternion(ori)
         # 调整激光雷达安装位置
         start = list(start)
@@ -123,7 +148,7 @@ class Robot(object):
         rayToPos = np.array([[start[0] + rayLength * np.cos(angle * float(i) / (rayNum - 1) + yaw),
                               start[1] + rayLength * np.sin(angle * float(i) / (rayNum - 1) + yaw),
                               start[2]] for i in range(rayNum)])
-        results = p.rayTestBatch(rayFromPos, rayToPos)  # 激光射线函数 返回被命中对象id、命中对象连杆索引（base连杆为-1）
+        results = p.rayTestBatch(rayFromPos, rayToPos, self.client_id)  # 激光射线函数 返回被命中对象id、命中对象连杆索引（base连杆为-1）
 
         hit_position = [result[2] * rayLength for result in results]
 
@@ -133,14 +158,14 @@ class Robot(object):
 
             for index, result in enumerate(results):
                 if result[0] == -1:
-                    p.addUserDebugLine(rayFromPos[index], rayToPos[index], [1, 0, 0])
+                    p.addUserDebugLine(rayFromPos[index], rayToPos[index], [1, 0, 0], physicsClientId=self.client_id)
                 else:
-                    p.addUserDebugLine(rayFromPos[index], rayToPos[index], [0, 1, 0])
+                    p.addUserDebugLine(rayFromPos[index], rayToPos[index], [0, 1, 0], physicsClientId=self.client_id)
         return hit_position
 
     def goto(self, goal):
         goal_x, goal_y = goal[0], goal[1]
-        basePos = p.getBasePositionAndOrientation(self.robot)
+        basePos = p.getBasePositionAndOrientation(self.robot, physicsClientId=self.client_id)
         current_x = basePos[0][0]
         current_y = basePos[0][1]
 
@@ -181,7 +206,7 @@ class Robot(object):
         v_left = v - w * ROBOT_WIDTH / 2.0
         v_right = v + w * ROBOT_WIDTH / 2.0
 
-        return v_left, v_right
+        return v_left / ROBOT_WHEEL_RADIUS, v_right / ROBOT_WHEEL_RADIUS
 
     def is_reachable(self):
         pos, _ = p.getBasePositionAndOrientation(self.robot, self.client_id)

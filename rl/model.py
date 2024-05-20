@@ -29,7 +29,7 @@ class PPO:
         if test_env is not None:
             self.test_env = test_env
 
-    def evaluate(self, steps: int = 1000, times: int = 3):
+    def evaluate(self, steps: int = 5000, times: int = 3):
         assert self.test_env is not None, "Please input a test environment"
 
         rewards = []
@@ -46,13 +46,13 @@ class PPO:
                     r.append(reward)
                     done = self.check_done(te=te, tr=tr)
 
-                    if np.array(done).all():
+                    if np.array(done).all() or step == steps - 1:
                         rewards.append(np.sum(np.array(r), axis=0))
                         break
 
-        return rewards
+        return np.mean(rewards)
 
-    def check_done(self, te, tr, lim=5):
+    def check_done(self, te, tr, lim=0):
         assert len(te) == len(tr), "the length of te or tr are incorrect"
 
         done_te = True
@@ -76,7 +76,8 @@ class PPO:
         self.agent.load_state_dict(torch.load('agent.pth'))
 
     # 训练
-    def update(self):
+    def update(self, FPS=5):
+
         run_name = f"{self.args.gym_id}__{self.args.exp_name}"
         self.robots_num = self.env.robots_num
 
@@ -115,6 +116,11 @@ class PPO:
                 lrnow = frac * self.args.learning_rate
                 self.optimizer.param_groups[0]["lr"] = lrnow
 
+            # 在开局时的动作时效延长
+            # frac_fps = 1 - (update - 1) / num_updates
+            # FPS = int(FPS * frac_fps)
+            # FPS = FPS if FPS >= 1 else 1
+
             for step in range(0, self.args.num_steps):
                 global_step += 1 * self.robots_num
                 obs[step] = next_obs
@@ -129,7 +135,7 @@ class PPO:
                 logprobs[step] = logprob
 
                 # TRY NOT TO MODIFY: execute the game and log data.
-                next_obs, reward, te, tr, info = self.env.step(action.cpu().numpy())
+                next_obs, reward, te, tr, info = self.env.step(action.cpu().numpy(), FPS=FPS)
                 done = self.check_done(te=te, tr=tr)
                 rewards[step] = torch.tensor(reward).to(self.device).view(-1)
                 next_obs, next_done = torch.Tensor(next_obs).to(self.device), torch.Tensor(done).to(self.device)
@@ -231,6 +237,7 @@ class PPO:
             writer.add_scalar("losses/explained_variance", explained_var, global_step)
             # print("SPS:", int(global_step / (time.time() - start_time)))
             writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
+            writer.add_scalar("charts/FPS", FPS, global_step)
 
             train_reward = rewards.sum(0).mean().item()
             recent_best_reward = train_reward if train_reward > recent_best_reward else recent_best_reward
@@ -243,9 +250,9 @@ class PPO:
 
             test_reward = self.evaluate()
             writer.add_scalar("rewards/test rewards", test_reward, global_step)
-            writer.add_scalar("rewards/train rewards", test_reward, global_step)
+            writer.add_scalar("rewards/train rewards", train_reward, global_step)
 
+            torch.save(self.agent.state_dict(), 'agent.pth')
             if max_reward < test_reward:
-                torch.save(self.agent.state_dict(), 'agent.pth')
                 max_reward = test_reward
                 print('\nupdate agent with train reward:{}, test reward:{}'.format(train_reward, test_reward))

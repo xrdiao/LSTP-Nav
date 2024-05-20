@@ -60,19 +60,20 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 class Agent(nn.Module):
     def __init__(self, env):
         super(Agent, self).__init__()
+        self.hidden_dim = 256
         self.critic = nn.Sequential(
-            layer_init(nn.Linear(np.array(env.observation_space.shape).prod(), 64)),
+            layer_init(nn.Linear(np.array(env.observation_space.shape).prod(), self.hidden_dim)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
+            layer_init(nn.Linear(self.hidden_dim, self.hidden_dim)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, 1), std=1.0),
+            layer_init(nn.Linear(self.hidden_dim, 1), std=1.0),
         )
         self.actor_mean = nn.Sequential(
-            layer_init(nn.Linear(np.array(env.observation_space.shape).prod(), 64)),
+            layer_init(nn.Linear(np.array(env.observation_space.shape).prod(), self.hidden_dim)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
+            layer_init(nn.Linear(self.hidden_dim, self.hidden_dim)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, np.prod(env.action_space.shape)), std=0.01),
+            layer_init(nn.Linear(self.hidden_dim, np.prod(env.action_space.shape)), std=0.01),
         )
         self.actor_logstd = nn.Parameter(torch.zeros(1, np.prod(env.action_space.shape)))
         self.action_bound = env.action_space.high[0]
@@ -87,7 +88,6 @@ class Agent(nn.Module):
         probs = Normal(action_mean, action_std)
         if action is None:
             action = probs.sample()
-            action = action.clamp(-self.action_bound, self.action_bound)
         return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
 
 

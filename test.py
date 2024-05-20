@@ -14,21 +14,28 @@ device = torch.device('cuda') if torch.cuda.is_available() \
 
 def test():
     render = True
-    env = gym.make('MyEnv-v0', render=render, urdf_path=urdf_path)
-    p.resetDebugVisualizerCamera(cameraDistance=3, cameraYaw=0, cameraPitch=-89.9,
+    # env = gym.make('MyEnv-v0', render=render, urdf_path=urdf_path)
+    env = MyEnv(render=render, urdf_path=urdf_path)
+    p.resetDebugVisualizerCamera(cameraDistance=10, cameraYaw=0, cameraPitch=-89.9,
                                  cameraTargetPosition=[0, 0, 0])
 
-    robot_nums = 2
+    robot_nums = 1
     lim = 5
 
     print('robot_nums:', robot_nums)
     for i in range(robot_nums):
-        env.add_random_robot(lim=lim)
+        goal = [i, 0.3 + i]
+
+        yaw = np.pi * robot_nums
+        ori = p.getQuaternionFromEuler([0, 0, np.pi/2], env.physics_client_id)
+        state = [i, 0, 0.01] + list(ori)
+        env.add_robot(state, goal)
+        # env.add_random_robot(lim=lim)
 
     agent = PPO(env, test_env=env)
     rewards = []
     action = np.zeros([env.robots_num, 2])
-    next_obs, _ = env.reset()
+    # next_obs, _ = env.reset()
 
     # 只收集了一个机器人的rewards
     with torch.no_grad():
@@ -43,7 +50,8 @@ def test():
 
                 next_obs, reward, te, tr, info_ = env.step(action)
                 r.append(reward)
-                done = agent.check_done(te=te, tr=tr)
+                done = agent.check_done(te=te, tr=tr, lim=0)
+                # print('reward:', reward)
 
                 if np.array(done).all():
                     rewards.append(np.sum(np.array(r), axis=0))
@@ -53,8 +61,12 @@ def test():
 
 
 def main():
-    render = True
-    env = gym.make('MyEnv-v0', render=render, urdf_path=urdf_path)
+    render = False
+    # env = gym.make('MyEnv-v0', render=render, urdf_path=urdf_path)
+    env = MyEnv(render=render, urdf_path=urdf_path)
+
+    p.resetDebugVisualizerCamera(cameraDistance=3, cameraYaw=0, cameraPitch=-89.9,
+                                 cameraTargetPosition=[0, 0, 0])
 
     robot_nums = 2
     lim = 5
@@ -68,5 +80,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
-    # test()
+    # main()
+    test()

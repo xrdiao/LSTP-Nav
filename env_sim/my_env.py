@@ -37,6 +37,7 @@ class MyEnv(gym.Env):
 
         self.time_limit = None
         self.robots = []  # a Robot instance representing the robot
+
         self.global_time = 0
         self.step_counter = 0
         self.step_num = 0
@@ -76,6 +77,8 @@ class MyEnv(gym.Env):
                       urdf_path=self.urdf_path)
         robot.set_target_pos(goal)
         robot.cur_dis = self.__distance(np.array(state[:2]), np.array(goal[:2]))
+        robot.cur_pos = state[:2]
+
         self.robots.append(robot)
         self.robots_num += 1
         self.init_state.append(state)
@@ -113,6 +116,7 @@ class MyEnv(gym.Env):
         robot = Robot(base_pos=pos, base_ori=ori, client_id=self._physics_client_id, urdf_path=self.urdf_path)
         robot.set_target_pos(goal)
         robot.cur_dis = self.__distance(np.array(pos[:2]), np.array(goal[:2]))
+        robot.cur_pos = pos
 
         state = pos + ori
         self.robots.append(robot)
@@ -135,20 +139,24 @@ class MyEnv(gym.Env):
 
         for i, rob in enumerate(self.robots):
             obs_dict = rob.get_vel_and_pos()
-            angular_speed = obs_dict['angular_vel']
+            angular_speed, acc = obs_dict['angular_vel'], obs_dict['acc']
 
             # 到达目标点奖励
             if rob.is_reachable():
-                te[i] = True
+                # te[i] = True
                 if not rob.reach_goal:
                     rg = ARRIVAL_REWARD
                     rob.reach_goal = True
-                else:
+                else:  # 到达目标点后不重复获得奖励
                     rg = 0
             # 距离目标点距离奖励
             else:
                 rg = DISTANCE_REWARD_WEIGHT * (rob.cur_dis.item() - distances[i])
-                rob.reach_goal = False
+
+                # 到达目标点后离开目标点需要扣除已获得的奖励
+                if rob.reach_goal:
+                    rob.reach_goal = False
+                    rg = -ARRIVAL_REWARD + rg
 
             # 碰撞时惩罚
             if self.checkCollision(rob.robot):
@@ -159,8 +167,12 @@ class MyEnv(gym.Env):
                 rc = 0
 
             # 过大角速度时惩罚
-            rw = ANGULAR_VELOCITY_PENALTY * abs(angular_speed) if abs(angular_speed) > 0.7 else 0
-            rewards.append(rg + rc + rw)
+            rw = ANGULAR_VELOCITY_PENALTY * abs(angular_speed) if abs(angular_speed) > 1000 else 0
+            ra = ACCELERATION_VELOCITY_PENALTY * abs(acc) if abs(acc) > 1000 else 0
+            r_action = ACTION_PENALTY * rob.del_action if abs(rob.del_action) > 0.3 else 0
+
+            # print(rg, rw, rc, ra, r_action)
+            rewards.append(rg + rc + rw + ra + r_action)
 
         return rewards, te, tr
 
@@ -168,27 +180,42 @@ class MyEnv(gym.Env):
         v1, v2 = np.array(v1), np.array(v2)
         return np.linalg.norm(v1 - v2)
 
-    def step(self, actions):
+    def step(self, actions, FPS=1):
+        '''
+        :param actions: The actions of robots
+        :param FPS: The FPS of the actions
+        :return:
+        '''
         assert self.robots is not None, 'no robots loaded'
         assert self.robots_num == len(actions), 'incorrect number of the actions'
 
         self.global_time += self.time_step
 
-        # 判断是否到达终点
-        for i, action in enumerate(actions):
-            if self.robots[i].is_reachable():
-                self.robots[i].apply_action([0, 0])
-            else:
-                self.robots[i].apply_action(action)
+        # 更新 t 时刻机器人距终点的距离
+        for i, rob in enumerate(self.robots):
+            rob.cur_dis = self.__distance(rob.cur_pos[:2], rob.target_pos[:2])
+            rob.del_action = abs(rob.cur_action[0] - actions[i][0])  # 只取速度
 
-        p.stepSimulation(physicsClientId=self._physics_client_id)
+        for i, action in enumerate(actions):
+            self.robots[i].apply_action(action)
+
+        # 判断是否到达终点
+        # for i, action in enumerate(actions):
+        #     if self.robots[i].is_reachable():
+        #         self.robots[i].apply_action([0, 0])
+        #     else:
+        #         self.robots[i].apply_action(action)
+
+        # 为了让一个动作的作用更加明显，让同一个动作执行多次
+        for _ in range(FPS):
+            p.stepSimulation(physicsClientId=self._physics_client_id)
         self.step_num += 1
 
-        # 收集机器人观测量，计算奖励
+        # 收集机器人观测量，计算奖励，t+1
         distances = []
         current_state = []
         for i in range(self.robots_num):
-            obs = self.robots[i].get_observation()
+            obs = self.robots[i].get_observation()  # 获取 t+1 时刻的观测值，并且更新机器人记录的当前时刻位置
             laser = obs['laser']
             distance = obs['distance']
             angle = obs['angle']
@@ -196,11 +223,8 @@ class MyEnv(gym.Env):
             distances.append(distance[0])
         reward, te, tr = self.__reward_func(distances)
 
-        #  更新上一个时刻的距目标点距离
-        for i, rob in enumerate(self.robots):
-            rob.cur_dis = distances[i]
-        _info = {"distance": distances, "collision_num": self.collision_num}
-        return np.array(current_state), reward, te, tr, _info
+        info = {"distance": distances, "collision_num": self.collision_num}
+        return np.array(current_state), reward, te, tr, info
 
     def reset_robot(self, idx: int, lim: int = 5):
         '''
@@ -229,6 +253,7 @@ class MyEnv(gym.Env):
         """
             - reset scene items
             - reload robot
+            :param lim: range of the random position of the robots, 0 means the specified location, defaults to 0
         """
         assert self.robots is not None, 'no robots loaded'
 
@@ -285,8 +310,7 @@ class MyEnv(gym.Env):
                     self.add_random_robot(lim)
             else:
                 for i in range(robot_num):
-                    pos, ori = init_state[i][:3], init_state[i][3:]
-                    self.add_robot(pos + ori, init_goal[i])
+                    self.add_robot(init_state[i], init_goal[i])
 
             for i in range(robot_num):
                 obs = self.robots[i].get_observation()
@@ -305,6 +329,7 @@ class MyEnv(gym.Env):
             p.addUserDebugText('{}'.format(idx), pos, [1, 0, 0], 1)
 
     def render(self, mode='human'):
+
         pass
 
     def seed(self, seed=None):
