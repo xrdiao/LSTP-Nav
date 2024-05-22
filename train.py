@@ -18,13 +18,13 @@ def main():
     test_env = MyEnv(render=render, urdf_path=urdf_path)
     agent = PPO(env, test_env)
 
-    robot_nums = 2
+    robot_nums = 1
     lim = 5
 
     print('robot_nums:', robot_nums)
     for i in range(robot_nums):
         env.add_random_robot(lim=lim)
-    for _ in range(2):
+    for _ in range(robot_nums):
         test_env.add_random_robot(lim=lim)
 
     if render:

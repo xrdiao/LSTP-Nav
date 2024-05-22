@@ -29,7 +29,7 @@ class PPO:
         if test_env is not None:
             self.test_env = test_env
 
-    def evaluate(self, steps: int = 5000, times: int = 3, lim: int = 5):
+    def evaluate(self, steps: int = 5000, times: int = 3, lim: int = 5, debug:bool = False):
         assert self.test_env is not None, "Please input a test environment"
 
         rewards = []
@@ -44,7 +44,9 @@ class PPO:
 
                     next_obs, reward, te, tr, info_ = self.test_env.step(action.cpu().numpy())
                     r.append(reward)
-                    done = self.check_done(te=te, tr=tr, lim=lim)
+                    done = self.test_env.check_done(te=te, tr=tr, lim=lim)
+                    if debug:
+                        print('action:', action, 'reward:', reward)
 
                     if np.array(done).all() or step == steps - 1:
                         rewards.append(np.sum(np.array(r), axis=0))
@@ -52,31 +54,11 @@ class PPO:
 
         return np.mean(rewards)
 
-    def check_done(self, te, tr, lim=0):
-        assert len(te) == len(tr), "the length of te or tr are incorrect"
-
-        done_te = True
-        for i in range(len(te)):
-            if not te[i]:
-                done_te = False
-                break
-
-        done_tr = False
-        for i in range(len(tr)):
-            if tr[i]:
-                done_tr = True
-                break
-
-        if done_te or done_tr:
-            a, _ = self.env.reset(lim=lim, tr=tr, te=te)
-        done = [i or j for i, j in zip(te, tr)]
-        return done
-
     def load_model(self):
         self.agent.load_state_dict(torch.load('agent.pth'))
 
     # 训练
-    def update(self, FPS=5, lim=5):
+    def update(self, FPS=3, lim=5):
 
         run_name = f"{self.args.gym_id}__{self.args.exp_name}"
         self.robots_num = self.env.robots_num
@@ -136,7 +118,7 @@ class PPO:
 
                 # TRY NOT TO MODIFY: execute the game and log data.
                 next_obs, reward, te, tr, info = self.env.step(action.cpu().numpy(), FPS=FPS)
-                done = self.check_done(te=te, tr=tr, lim=lim)
+                done = self.env.check_done(te=te, tr=tr, lim=lim)
                 rewards[step] = torch.tensor(reward).to(self.device).view(-1)
                 next_obs, next_done = torch.Tensor(next_obs).to(self.device), torch.Tensor(done).to(self.device)
 
@@ -256,3 +238,5 @@ class PPO:
             if max_reward < test_reward:
                 max_reward = test_reward
                 print('\nupdate agent with train reward:{}, test reward:{}'.format(train_reward, test_reward))
+                torch.save(self.agent.state_dict(), 'agent_best_test.pth')
+

@@ -12,9 +12,9 @@ class Agent:
 
     def __init__(self, simulator):
         self.simulator_ = simulator
-        self.agent_neighbors_ = [] # (float, Agent)
-        self.obstacle_neighbors_ = [] # (float, Obstacle)
-        self.orca_lines_ = [] # Line
+        self.agent_neighbors_ = []  # (float, Agent)
+        self.obstacle_neighbors_ = []  # (float, Obstacle)
+        self.orca_lines_ = []  # Line
         self.position_ = Vector2()
         self.pref_velocity_ = Vector2()
         self.velocity_ = Vector2()
@@ -60,9 +60,12 @@ class Agent:
             alreadyCovered = False
 
             for j in range(len(self.orca_lines_)):
-                det1 = rvo_math.det(invTimeHorizonObst * relativePosition1 - self.orca_lines_[j].point, self.orca_lines_[j].direction)
-                det2 = rvo_math.det(invTimeHorizonObst * relativePosition2 - self.orca_lines_[j].point, self.orca_lines_[j].direction)
-                if (det1 - invTimeHorizonObst * self.radius_ >= -rvo_math.EPSILON) and (det2 - invTimeHorizonObst * self.radius_ >= -rvo_math.EPSILON):
+                det1 = rvo_math.det(invTimeHorizonObst * relativePosition1 - self.orca_lines_[j].point,
+                                    self.orca_lines_[j].direction)
+                det2 = rvo_math.det(invTimeHorizonObst * relativePosition2 - self.orca_lines_[j].point,
+                                    self.orca_lines_[j].direction)
+                if (det1 - invTimeHorizonObst * self.radius_ >= -rvo_math.EPSILON) and (
+                        det2 - invTimeHorizonObst * self.radius_ >= -rvo_math.EPSILON):
                     alreadyCovered = True
                     break
 
@@ -115,8 +118,10 @@ class Agent:
                 obstacle2 = obstacle1
 
                 leg1 = math.sqrt(distSq1 - radiusSq)
-                leftLegDirection = Vector2(relativePosition1.x * leg1 - relativePosition1.y * self.radius_, relativePosition1.x * self.radius_ + relativePosition1.y * leg1) / distSq1
-                rightLegDirection = Vector2(relativePosition1.x * leg1 + relativePosition1.y * self.radius_, -relativePosition1.x * self.radius_ + relativePosition1.y * leg1) / distSq1
+                leftLegDirection = Vector2(relativePosition1.x * leg1 - relativePosition1.y * self.radius_,
+                                           relativePosition1.x * self.radius_ + relativePosition1.y * leg1) / distSq1
+                rightLegDirection = Vector2(relativePosition1.x * leg1 + relativePosition1.y * self.radius_,
+                                            -relativePosition1.x * self.radius_ + relativePosition1.y * leg1) / distSq1
             elif s > 1.0 and distSqLine <= radiusSq:
                 # Obstacle viewed obliquely so that right vertex defines velocity obstacle.
                 if not obstacle2.convex_:
@@ -126,20 +131,24 @@ class Agent:
                 obstacle1 = obstacle2
 
                 leg2 = math.sqrt(distSq2 - radiusSq)
-                leftLegDirection = Vector2(relativePosition2.x * leg2 - relativePosition2.y * self.radius_, relativePosition2.x * self.radius_ + relativePosition2.y * leg2) / distSq2
-                rightLegDirection = Vector2(relativePosition2.x * leg2 + relativePosition2.y * self.radius_, -relativePosition2.x * self.radius_ + relativePosition2.y * leg2) / distSq2
+                leftLegDirection = Vector2(relativePosition2.x * leg2 - relativePosition2.y * self.radius_,
+                                           relativePosition2.x * self.radius_ + relativePosition2.y * leg2) / distSq2
+                rightLegDirection = Vector2(relativePosition2.x * leg2 + relativePosition2.y * self.radius_,
+                                            -relativePosition2.x * self.radius_ + relativePosition2.y * leg2) / distSq2
             else:
                 # Usual situation.
                 if obstacle1.convex_:
                     leg1 = math.sqrt(distSq1 - radiusSq)
-                    leftLegDirection = Vector2(relativePosition1.x * leg1 - relativePosition1.y * self.radius_, relativePosition1.x * self.radius_ + relativePosition1.y * leg1) / distSq1
+                    leftLegDirection = Vector2(relativePosition1.x * leg1 - relativePosition1.y * self.radius_,
+                                               relativePosition1.x * self.radius_ + relativePosition1.y * leg1) / distSq1
                 else:
                     # Left vertex non-convex left leg extends cut-off line.
                     leftLegDirection = -obstacle1.direction_
 
                 if obstacle2.convex_:
                     leg2 = math.sqrt(distSq2 - radiusSq)
-                    rightLegDirection = Vector2(relativePosition2.x * leg2 + relativePosition2.y * self.radius_, -relativePosition2.x * self.radius_ + relativePosition2.y * leg2) / distSq2
+                    rightLegDirection = Vector2(relativePosition2.x * leg2 + relativePosition2.y * self.radius_,
+                                                -relativePosition2.x * self.radius_ + relativePosition2.y * leg2) / distSq2
                 else:
                     # Right vertex non-convex right leg extends cut-off line.
                     rightLegDirection = obstacle1.direction_
@@ -169,7 +178,8 @@ class Agent:
             # Project current velocity on velocity obstacle.
 
             # Check if current velocity is projected on cutoff circles.
-            t = 0.5 if obstacle1 == obstacle2 else ((self.velocity_ - leftCutOff) @ cutOffVector) / rvo_math.abs_sq(cutOffVector)
+            t = 0.5 if obstacle1 == obstacle2 else ((self.velocity_ - leftCutOff) @ cutOffVector) / rvo_math.abs_sq(
+                cutOffVector)
             tLeft = (self.velocity_ - leftCutOff) @ leftLegDirection
             tRight = (self.velocity_ - rightCutOff) @ rightLegDirection
 
@@ -190,14 +200,18 @@ class Agent:
                 continue
 
             # Project on left leg, right leg, or cut-off line, whichever is closest to velocity.
-            distSqCutoff = math.inf if t < 0.0 or t > 1.0 or obstacle1 == obstacle2 else rvo_math.abs_sq(self.velocity_ - (leftCutOff + t * cutOffVector))
-            distSqLeft = math.inf if tLeft < 0.0 else rvo_math.abs_sq(self.velocity_ - (leftCutOff + tLeft * leftLegDirection))
-            distSqRight = math.inf if tRight < 0.0 else rvo_math.abs_sq(self.velocity_ - (rightCutOff + tRight * rightLegDirection))
+            distSqCutoff = math.inf if t < 0.0 or t > 1.0 or obstacle1 == obstacle2 else rvo_math.abs_sq(
+                self.velocity_ - (leftCutOff + t * cutOffVector))
+            distSqLeft = math.inf if tLeft < 0.0 else rvo_math.abs_sq(
+                self.velocity_ - (leftCutOff + tLeft * leftLegDirection))
+            distSqRight = math.inf if tRight < 0.0 else rvo_math.abs_sq(
+                self.velocity_ - (rightCutOff + tRight * rightLegDirection))
 
             if distSqCutoff <= distSqLeft and distSqCutoff <= distSqRight:
                 # Project on cut-off line.
                 line.direction = -obstacle1.direction_
-                line.point = leftCutOff + self.radius_ * invTimeHorizonObst * Vector2(-line.direction.y, line.direction.x)
+                line.point = leftCutOff + self.radius_ * invTimeHorizonObst * Vector2(-line.direction.y,
+                                                                                      line.direction.x)
                 self.orca_lines_.append(line)
                 continue
 
@@ -207,7 +221,8 @@ class Agent:
                     continue
 
                 line.direction = leftLegDirection
-                line.point = leftCutOff + self.radius_ * invTimeHorizonObst * Vector2(-line.direction.y, line.direction.x)
+                line.point = leftCutOff + self.radius_ * invTimeHorizonObst * Vector2(-line.direction.y,
+                                                                                      line.direction.x)
                 self.orca_lines_.append(line)
 
                 continue
@@ -259,10 +274,12 @@ class Agent:
 
                     if rvo_math.det(relativePosition, w) > 0.0:
                         # Project on left leg.
-                        line.direction = Vector2(relativePosition.x * leg - relativePosition.y * combinedRadius, relativePosition.x * combinedRadius + relativePosition.y * leg) / distSq
+                        line.direction = Vector2(relativePosition.x * leg - relativePosition.y * combinedRadius,
+                                                 relativePosition.x * combinedRadius + relativePosition.y * leg) / distSq
                     else:
                         # Project on right leg.
-                        line.direction = -Vector2(relativePosition.x * leg + relativePosition.y * combinedRadius, -relativePosition.x * combinedRadius + relativePosition.y * leg) / distSq
+                        line.direction = -Vector2(relativePosition.x * leg + relativePosition.y * combinedRadius,
+                                                  -relativePosition.x * combinedRadius + relativePosition.y * leg) / distSq
 
                     dotProduct2 = relativeVelocity @ line.direction
                     u = dotProduct2 * line.direction - relativeVelocity
@@ -282,10 +299,12 @@ class Agent:
             line.point = self.velocity_ + 0.5 * u
             self.orca_lines_.append(line)
 
-        lineFail, self.new_velocity_ = self.linear_program2(self.orca_lines_, self.max_speed_, self.pref_velocity_, False, self.new_velocity_)
+        lineFail, self.new_velocity_ = self.linear_program2(self.orca_lines_, self.max_speed_, self.pref_velocity_,
+                                                            False, self.new_velocity_)
 
         if lineFail < len(self.orca_lines_):
-            self.new_velocity_ = self.linear_program3(self.orca_lines_, numObstLines, lineFail, self.max_speed_, self.new_velocity_)
+            self.new_velocity_ = self.linear_program3(self.orca_lines_, numObstLines, lineFail, self.max_speed_,
+                                                      self.new_velocity_)
 
     def insert_agent_neighbor(self, agent, rangeSq):
         """
@@ -484,13 +503,17 @@ class Agent:
                             # Line i and line j point in opposite direction.
                             line.point = 0.5 * (lines[i].point + lines[j].point)
                     else:
-                        line.point = lines[i].point + (rvo_math.det(lines[j].direction, lines[i].point - lines[j].point) / determinant) * lines[i].direction
+                        line.point = lines[i].point + (
+                                    rvo_math.det(lines[j].direction, lines[i].point - lines[j].point) / determinant) * \
+                                     lines[i].direction
 
                     line.direction = rvo_math.normalize(lines[j].direction - lines[i].direction)
                     projLines.append(line)
 
                 tempResult = result
-                lineFail, result = self.linear_program2(projLines, radius, Vector2(-lines[i].direction.y, lines[i].direction.x), True, result)
+                lineFail, result = self.linear_program2(projLines, radius,
+                                                        Vector2(-lines[i].direction.y, lines[i].direction.x), True,
+                                                        result)
                 if lineFail < len(projLines):
                     """
                     This should in principle not happen. The result is by definition already in the feasible region of this linear program. If it fails, it is due to small floating point error, and the current result is kept.

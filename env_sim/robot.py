@@ -35,7 +35,8 @@ class Robot(object):
         self.cur_action = np.zeros(2)
 
         # 记录动作的变化
-        self.del_action = None
+        self.del_vel = None
+        self.del_angle = None
 
     def reset(self):
         # reset可能会导致有些机器人直接被卡住，所以随机reset吧
@@ -52,7 +53,7 @@ class Robot(object):
         pos, ori = p.getBasePositionAndOrientation(self.robot, self.client_id)
         return dict(vel=vel[:2], angular_vel=angular_vel[-1], pos=pos, ori=ori, acc=self.cur_acc)
 
-    def __get_forward_vector(self):  # 获取机器人朝向的向量
+    def get_forward_vector(self):  # 获取机器人朝向的向量
         _, baseOri = p.getBasePositionAndOrientation(self.robot, self.client_id)
         matrix = p.getMatrixFromQuaternion(baseOri)
         return [matrix[0], matrix[3], matrix[6]]
@@ -97,7 +98,7 @@ class Robot(object):
         if not (isinstance(action, list) or isinstance(action, np.ndarray)):
             assert f"apply_action() only receive list or ndarray, but receive {type(action)}"
         self.cur_action = action.copy()
-        left_v, right_v = self.action2commend(self.cur_action)
+        left_v, right_v = self.action2commend(action)
 
         left_v = self.clipv(left_v)
         right_v = self.clipv(right_v)

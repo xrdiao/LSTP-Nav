@@ -24,14 +24,14 @@ warnings.filterwarnings("ignore")
 class MyEnv(gym.Env):
     def __init__(self, scene_name: str = "plane_static_obstacle-A", render: bool = False, evaluate: bool = False,
                  urdf_path: Optional[str] = 'utils/data/turtlebot.urdf'):
-        self.time_step = 1. / 240.
+        self.time_step = 1. / 144.
 
         self.random_mode = render
         self._physics_client_id = p.connect(p.GUI if self.random_mode else p.DIRECT)
-        p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
+        p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0, physicsClientId=self._physics_client_id)
         p.setGravity(0., 0., -9.8, physicsClientId=self._physics_client_id)
-        p.setRealTimeSimulation(0)  # 1表示随着真实时间仿真，0表示要用p.step()进行步进
-        p.setTimeStep(self.time_step)
+        p.setRealTimeSimulation(0, physicsClientId=self._physics_client_id)  # 1表示随着真实时间仿真，0表示要用p.step()进行步进
+        p.setTimeStep(self.time_step, physicsClientId=self._physics_client_id)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.loadURDF("plane.urdf", physicsClientId=self._physics_client_id)
 
@@ -84,6 +84,28 @@ class MyEnv(gym.Env):
         self.init_state.append(state)
         self.init_goal.append(goal)
 
+    def check_done(self, te, tr, lim=5):
+        assert len(te) == len(tr), "the length of te or tr are incorrect"
+
+        # 机器人都到达目标点时te为true
+        done_te = True
+        for i in range(len(te)):
+            if not te[i]:
+                done_te = False
+                break
+
+        # 有机器人发生碰撞时tr为true
+        done_tr = False
+        for i in range(len(tr)):
+            if tr[i]:
+                done_tr = True
+                break
+
+        if done_te or done_tr:
+            a, _ = self.reset(lim=lim, tr=tr, te=te)
+        done = [i or j for i, j in zip(te, tr)]
+        return done
+
     def add_random_robot(self, lim=1):
         '''
         Add a random robot to the environment
@@ -128,7 +150,9 @@ class MyEnv(gym.Env):
         # 也可以用距离判断
         if p.getContactPoints(bodyA=robot_id, linkIndexA=-1, physicsClientId=self._physics_client_id):
             if debug:
-                print("robot with id={} collides!".format(robot_id))
+                print("robot with id={} collides!, state:{}, physical id:{}".format(robot_id,
+                                                                                    self.robots[robot_id - 1].cur_pos,
+                                                                                    self._physics_client_id))
             return True
         return False
 
@@ -167,12 +191,12 @@ class MyEnv(gym.Env):
                 rc = 0
 
             # 过大角速度时惩罚
-            rw = ANGULAR_VELOCITY_PENALTY * abs(angular_speed) if abs(angular_speed) > 1000 else 0
-            ra = ACCELERATION_VELOCITY_PENALTY * abs(acc) if abs(acc) > 1000 else 0
-            r_action = ACTION_PENALTY * rob.del_action if abs(rob.del_action) > 0.3 else 0
+            rw = ANGULAR_VELOCITY_PENALTY * rob.del_angle if rob.del_angle > 0.3 else 0
+            # ra = ACCELERATION_VELOCITY_PENALTY * abs(acc) if abs(acc) > 1000 else 0
+            rv = VELOCITY_PENALTY * rob.del_vel if abs(rob.del_vel) > 0.3 else 0
 
             # print(rg, rw, rc, ra, r_action)
-            rewards.append(rg + rc + rw + ra + r_action)
+            rewards.append(rg + rc + rw + rv)
 
         return rewards, te, tr
 
@@ -194,7 +218,8 @@ class MyEnv(gym.Env):
         # 更新 t 时刻机器人距终点的距离
         for i, rob in enumerate(self.robots):
             rob.cur_dis = self.__distance(rob.cur_pos[:2], rob.target_pos[:2])
-            rob.del_action = abs(rob.cur_action[0] - actions[i][0])  # 只取速度
+            rob.del_vel = abs(rob.cur_action[0] - actions[i][0])
+            rob.del_angle = abs(rob.cur_action[1] - actions[i][1])
 
         for i, action in enumerate(actions):
             self.robots[i].apply_action(action)
@@ -249,11 +274,11 @@ class MyEnv(gym.Env):
         p.resetBasePositionAndOrientation(self.robots[idx].robot, pos, ori, self._physics_client_id)
 
     def reset(self, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None, phase='train', test_case=None,
-              tr: list = None, te: list = None, lim=0):
+              tr: list = None, te: list = None, lim=5):
         """
             - reset scene items
             - reload robot
-            :param lim: range of the random position of the robots, 0 means the specified location, defaults to 0
+            :param lim: range of the random position of the robots, 0 means the specified location
         """
         assert self.robots is not None, 'no robots loaded'
 
@@ -286,8 +311,8 @@ class MyEnv(gym.Env):
             # reset scene
             p.resetSimulation(physicsClientId=self._physics_client_id)
             p.setGravity(0., 0., -9.8, physicsClientId=self._physics_client_id)
-            p.setRealTimeSimulation(0)
-            p.setTimeStep(self.time_step)
+            p.setRealTimeSimulation(0, physicsClientId=self._physics_client_id)
+            p.setTimeStep(self.time_step, physicsClientId=self._physics_client_id)
             p.setAdditionalSearchPath(pybullet_data.getDataPath())
             p.loadURDF("plane.urdf", physicsClientId=self._physics_client_id)
 
@@ -323,10 +348,11 @@ class MyEnv(gym.Env):
         return np.array(current_state), dict()
 
     def show_goal_point(self):
-        p.addUserDebugPoints([[_g[0], _g[1], 0.5] for _g in self.init_goal], [[1, 0, 0]] * self.robots_num, 10)
+        p.addUserDebugPoints([[_g[0], _g[1], 0.5] for _g in self.init_goal], [[1, 0, 0]] * self.robots_num, 10,
+                             physicsClientId=self._physics_client_id)
         for idx in range(self.robots_num):
             pos = [self.init_goal[idx][0], self.init_goal[idx][1], 0.5]
-            p.addUserDebugText('{}'.format(idx), pos, [1, 0, 0], 1)
+            p.addUserDebugText('{}'.format(idx), pos, [1, 0, 0], 1, physicsClientId=self._physics_client_id)
 
     def render(self, mode='human'):
 
@@ -338,11 +364,11 @@ class MyEnv(gym.Env):
 
     def close(self):
         if self._physics_client_id >= 0:
-            p.disconnect()
+            p.disconnect(physicsClientId=self._physics_client_id)
         self._physics_client_id = -1
 
     def place_cube(self, x, y, size=0.5):
-        p.loadURDF("cube.urdf", [x, y, size])
+        p.loadURDF("cube.urdf", [x, y, size], physicsClientId=self._physics_client_id)
 
     @property
     def physics_client_id(self):

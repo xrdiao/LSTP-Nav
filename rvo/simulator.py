@@ -193,5 +193,3 @@ class Simulator:
             timeStep (float): The time step of the simulation. Must be positive.
         """
         self.time_step_ = timeStep
-
-

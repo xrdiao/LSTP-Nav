@@ -50,7 +50,7 @@ def test():
 
                 next_obs, reward, te, tr, info_ = env.step(action)
                 r.append(reward)
-                done = agent.check_done(te=te, tr=tr, lim=0)
+                done = env.check_done(te=te, tr=tr, lim=0)
                 # print('reward:', reward)
 
                 if np.array(done).all():
@@ -61,14 +61,14 @@ def test():
 
 
 def main():
-    render = False
+    render = True
     # env = gym.make('MyEnv-v0', render=render, urdf_path=urdf_path)
     env = MyEnv(render=render, urdf_path=urdf_path)
 
     p.resetDebugVisualizerCamera(cameraDistance=3, cameraYaw=0, cameraPitch=-89.9,
                                  cameraTargetPosition=[0, 0, 0])
 
-    robot_nums = 2
+    robot_nums = 1
     lim = 5
 
     print('robot_nums:', robot_nums)
@@ -76,9 +76,9 @@ def main():
         env.add_random_robot(lim=lim)
 
     agent = PPO(env, test_env=env)
-    agent.evaluate(steps=100000)
+    agent.evaluate(debug=True)
 
 
 if __name__ == '__main__':
-    # main()
-    test()
+    main()
+    # test()

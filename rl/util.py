@@ -60,7 +60,7 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 class Agent(nn.Module):
     def __init__(self, env):
         super(Agent, self).__init__()
-        self.hidden_dim = 256
+        self.hidden_dim = 64
         self.critic = nn.Sequential(
             layer_init(nn.Linear(np.array(env.observation_space.shape).prod(), self.hidden_dim)),
             nn.Tanh(),
@@ -73,7 +73,7 @@ class Agent(nn.Module):
             nn.Tanh(),
             layer_init(nn.Linear(self.hidden_dim, self.hidden_dim)),
             nn.Tanh(),
-            layer_init(nn.Linear(self.hidden_dim, np.prod(env.action_space.shape)), std=0.01),
+            layer_init(nn.Linear(self.hidden_dim, np.prod(env.action_space.shape)), std=0.1),
         )
         self.actor_logstd = nn.Parameter(torch.zeros(1, np.prod(env.action_space.shape)))
         self.action_bound = env.action_space.high[0]
@@ -98,7 +98,7 @@ def parse_args():
                         help="the name of this experiment")
     parser.add_argument("--gym-id", type=str, default="MyEnv-v0",
                         help="the id of the gym environment")
-    parser.add_argument("--learning-rate", type=float, default=3e-4,
+    parser.add_argument("--learning-rate", type=float, default=2e-5,
                         help="the learning rate of the optimizer")
     parser.add_argument("--seed", type=int, default=1,
                         help="seed of the experiment")
@@ -122,7 +122,7 @@ def parse_args():
                         help="the number of parallel game environments")
     parser.add_argument("--num-steps", type=int, default=648,
                         help="the number of steps to run in each environment per policy rollout")
-    parser.add_argument("--anneal-lr", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
+    parser.add_argument("--anneal-lr", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
                         help="Toggle learning rate annealing for policy and value networks")
     parser.add_argument("--gae", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
                         help="Use GAE for advantage computation")
@@ -130,7 +130,7 @@ def parse_args():
                         help="the discount factor gamma")
     parser.add_argument("--gae-lambda", type=float, default=0.95,
                         help="the lambda for the general advantage estimation")
-    parser.add_argument("--num-minibatches", type=int, default=32,
+    parser.add_argument("--num-minibatches", type=int, default=16,
                         help="the number of mini-batches")
     parser.add_argument("--update-epochs", type=int, default=10,
                         help="the K epochs to update the policy")
