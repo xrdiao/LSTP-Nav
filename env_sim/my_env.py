@@ -24,7 +24,7 @@ warnings.filterwarnings("ignore")
 class MyEnv(gym.Env):
     def __init__(self, scene_name: str = "plane_static_obstacle-A", render: bool = False, evaluate: bool = False,
                  urdf_path: Optional[str] = 'utils/data/turtlebot.urdf'):
-        self.time_step = 1. / 144.
+        self.time_step = 1. / 240.
 
         self.random_mode = render
         self._physics_client_id = p.connect(p.GUI if self.random_mode else p.DIRECT)
@@ -37,6 +37,7 @@ class MyEnv(gym.Env):
 
         self.time_limit = None
         self.robots = []  # a Robot instance representing the robot
+        self.obstacles = []
 
         self.global_time = 0
         self.step_counter = 0
@@ -150,9 +151,7 @@ class MyEnv(gym.Env):
         # 也可以用距离判断
         if p.getContactPoints(bodyA=robot_id, linkIndexA=-1, physicsClientId=self._physics_client_id):
             if debug:
-                print("robot with id={} collides!, state:{}, physical id:{}".format(robot_id,
-                                                                                    self.robots[robot_id - 1].cur_pos,
-                                                                                    self._physics_client_id))
+                print("robot with id={} collides!, state:{}, physical id:{}, collision number:{}".format(robot_id, self.robots[robot_id - 1].cur_pos, self._physics_client_id, self.collision_num))
             return True
         return False
 
@@ -368,7 +367,7 @@ class MyEnv(gym.Env):
         self._physics_client_id = -1
 
     def place_cube(self, x, y, size=0.5):
-        p.loadURDF("cube.urdf", [x, y, size], physicsClientId=self._physics_client_id)
+        self.obstacles.append(p.loadURDF("cube.urdf", [x, y, size], physicsClientId=self._physics_client_id))
 
     @property
     def physics_client_id(self):

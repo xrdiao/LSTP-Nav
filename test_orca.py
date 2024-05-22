@@ -47,8 +47,8 @@ def test():
 
     simulator.set_time_step(env.time_step)
 
-    robot_nums = 2
-    lim = 5
+    robot_nums = 30
+    lim = 7.5
 
     for i in range(robot_nums):
         env.add_random_robot(lim=lim)
@@ -62,7 +62,7 @@ def test():
     env.show_goal_point()
 
     goals = []
-    simulator.set_agent_defaults(15.0, 10, 10.0, 10.0, ROBOT_WIDTH, MAX_SPEED, Vector2(0.0, 0.0))
+    simulator.set_agent_defaults(15.0, 10, 10.0, 10.0, ROBOT_WIDTH+0.1, MAX_SPEED, Vector2(0.0, 0.0))
     for rob in env.robots:
         simulator.add_agent(Vector2(rob.init_pos[0], rob.init_pos[1]))
         goals.append(Vector2(rob.target_pos[0], rob.target_pos[1]))
@@ -76,7 +76,7 @@ def test():
         actions = []
         simulator.kd_tree_.build_agent_tree()
 
-        print('-------------------------------------------------')
+        # print('-------------------------------------------------')
         for agentNo in range(simulator.num_agents):
             simulator.agents_[agentNo].compute_neighbors()
             simulator.agents_[agentNo].compute_new_velocity()
@@ -98,7 +98,7 @@ def test():
         # update pybullet
         next_obs, reward, te, tr, info = env.step(actions)
         env.check_done(te=te, tr=tr, lim=lim)
-        print(reward)
+        # print(reward)
 
         # update simulator
         for agentNo, agent in enumerate(env.robots):
@@ -106,7 +106,7 @@ def test():
             vel, pos = obs_dict['vel'], obs_dict['pos']
             angle = agent.get_forward_vector()[:2]
 
-            simulator.agents_[agentNo].velocity_ = Vector2(vel[0] * angle[0], vel[0] * angle[1])
+            simulator.agents_[agentNo].velocity_ = Vector2(abs(vel[0]) * angle[0], abs(vel[0]) * angle[1])
             simulator.agents_[agentNo].position_ = Vector2(pos[0], pos[1])
 
 
