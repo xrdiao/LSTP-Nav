@@ -36,6 +36,18 @@ def set_preferred_velocities(simulator, goals):
         simulator.set_agent_pref_velocity(i, goal_vector)
 
 
+def obs2simulator(position: list):
+    x, y = position[0], position[1]
+    size = 1
+    left = x - size
+    right = x + size
+    top = y + size
+    bottom = y - size
+
+    obstacle = [Vector2(right, bottom), Vector2(right, top), Vector2(left, top), Vector2(left, bottom)]
+    return obstacle
+
+
 def test():
     # 目的是搭建一个沟通Myenv和simulator的桥梁
     render = True
@@ -47,27 +59,35 @@ def test():
 
     simulator.set_time_step(env.time_step)
 
-    robot_nums = 30
-    lim = 7.5
+    # obstacles = [[0,0],[0, 3], [0, -3], [3, 0], [-3, 0]]
+    # for obstacle in obstacles:
+    #     env.place_cube(obstacle)
+    #     obs = obs2simulator(obstacle)
+    #     simulator.add_obstacle(obs)
+    # simulator.process_obstacles()
 
-    for i in range(robot_nums):
-        env.add_random_robot(lim=lim)
+    robot_nums = 1
+    lim = 5
 
     # for i in range(robot_nums):
-    #     goal = [2+i, 3 + i]
-    #     ori = p.getQuaternionFromEuler([0, 0, np.pi / 2], env.physics_client_id)
-    #     state = [i, 0, 0.01] + list(ori)
-    #     env.add_robot(state, goal)
+    #     env.add_random_robot(lim=lim)
+
+    for i in range(robot_nums):
+        goal = [i, i]
+        ori = p.getQuaternionFromEuler([0, 0, np.pi / 2], env.physics_client_id)
+        state = [i, 0, 0.01] + list(ori)
+        env.add_robot(state, goal)
 
     env.show_goal_point()
 
     goals = []
-    simulator.set_agent_defaults(15.0, 10, 10.0, 10.0, ROBOT_WIDTH+0.1, MAX_SPEED, Vector2(0.0, 0.0))
+    simulator.set_agent_defaults(15.0, 10, 10.0, 10.0, ROBOT_WIDTH + 0.1, MAX_SPEED, Vector2(0.0, 0.0))
+
     for rob in env.robots:
         simulator.add_agent(Vector2(rob.init_pos[0], rob.init_pos[1]))
         goals.append(Vector2(rob.target_pos[0], rob.target_pos[1]))
 
-    while not reached_goal(simulator, goals):
+    while True:
         # while True:
 
         set_preferred_velocities(simulator, goals)
@@ -82,23 +102,22 @@ def test():
             simulator.agents_[agentNo].compute_new_velocity()
 
             action = simulator.agents_[agentNo].new_velocity_
-            x, y = env.robots[agentNo].get_forward_vector()[:2]
-            cur_vel = Vector2(x, y)
+            angle = env.robots[agentNo].follow_vector_angle([action.x, action.y])
 
-            theta = np.arccos((action @ cur_vel) / (abs(action) * abs(cur_vel) + 1e-7))
-            signal = -1 if rvo_math.det(action, cur_vel) > 0 else 1
-            theta = signal * abs(theta)
+            a = [abs(action), angle]
 
-            a = [abs(action), theta]
-            if abs(action) < 1e-3:
-                a = [0, 0]
             actions.append(a)
             # print(action, cur_vel, a, (action @ cur_vel) / (abs(action) * abs(cur_vel)))
 
         # update pybullet
         next_obs, reward, te, tr, info = env.step(actions)
-        env.check_done(te=te, tr=tr, lim=lim)
-        # print(reward)
+        done = env.check_done(te=te, tr=tr, lim=lim)
+        print(done)
+        for i, d in enumerate(done):
+            if d:
+                rob = env.robots[i]
+                goals[i] = Vector2(rob.target_pos[0], rob.target_pos[1])
+
 
         # update simulator
         for agentNo, agent in enumerate(env.robots):

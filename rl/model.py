@@ -22,14 +22,14 @@ class PPO:
 
         # 实例化策略网络
         self.env = env
-        self.agent = Agent(env).to(self.device)
+        self.agent = SimpleAgent().to(self.device)
         self.optimizer = optim.Adam(self.agent.parameters(), lr=self.args.learning_rate, eps=1e-5)
         self.robots_num = 0
 
         if test_env is not None:
             self.test_env = test_env
 
-    def evaluate(self, steps: int = 5000, times: int = 3, lim: int = 5, debug:bool = False):
+    def evaluate(self, steps: int = 5000, times: int = 3, lim: int = 5, debug: bool = False):
         assert self.test_env is not None, "Please input a test environment"
 
         rewards = []
@@ -40,7 +40,7 @@ class PPO:
                 r = []
 
                 for step in range(steps):
-                    action, _, _, value = self.agent.get_action_and_value(torch.Tensor(next_obs).to(self.device))
+                    action, _ = self.agent.get_deterministic_action(torch.Tensor(next_obs).to(self.device))
 
                     next_obs, reward, te, tr, info_ = self.test_env.step(action.cpu().numpy())
                     r.append(reward)
@@ -60,7 +60,7 @@ class PPO:
     # 训练
     def update(self, FPS=3, lim=5):
 
-        run_name = f"{self.args.gym_id}__{self.args.exp_name}"
+        run_name = f"{self.args.gym_id}_{self.args.exp_name}"
         self.robots_num = self.env.robots_num
 
         writer = SummaryWriter(f"runs/{run_name}")
@@ -97,11 +97,8 @@ class PPO:
                 frac = 1.0 - (update - 1.0) / num_updates
                 lrnow = frac * self.args.learning_rate
                 self.optimizer.param_groups[0]["lr"] = lrnow
-
-            # 在开局时的动作时效延长
-            # frac_fps = 1 - (update - 1) / num_updates
-            # FPS = int(FPS * frac_fps)
-            # FPS = FPS if FPS >= 1 else 1
+                if lrnow <= 2e-5:
+                    self.args.anneal_lr = False
 
             for step in range(0, self.args.num_steps):
                 global_step += 1 * self.robots_num
@@ -230,7 +227,7 @@ class PPO:
                 "bestTestReward": f'{max_reward:.2f}'
             })
 
-            test_reward = self.evaluate(lim=lim)
+            test_reward = self.evaluate(lim=lim, debug=False)
             writer.add_scalar("rewards/test rewards", test_reward, global_step)
             writer.add_scalar("rewards/train rewards", train_reward, global_step)
 
@@ -239,4 +236,3 @@ class PPO:
                 max_reward = test_reward
                 print('\nupdate agent with train reward:{}, test reward:{}'.format(train_reward, test_reward))
                 torch.save(self.agent.state_dict(), 'agent_best_test.pth')
-

@@ -5,50 +5,8 @@ from distutils.util import strtobool
 import numpy as np
 import torch
 from torch import nn
-from torch.distributions import Normal
+from torch.distributions import Normal, Categorical
 from torch.nn import functional as F
-
-
-class PolicyNet(nn.Module):
-    def __init__(self, n_states, n_actions, embed_dim, num_heads):
-        super(PolicyNet, self).__init__()
-
-        self.Q_goal = nn.Linear(2, embed_dim)
-        self.K_laser = nn.Linear(n_states - 2, embed_dim)
-        self.V_laser = nn.Linear(n_states - 2, embed_dim)
-        self.att_laser = nn.MultiheadAttention(embed_dim, num_heads)
-
-        self.fc_mu = nn.Linear(embed_dim, n_actions)
-        self.fc_std = nn.Linear(embed_dim, n_actions)
-
-    # 前向传播
-    def forward(self, x):
-        laser_info, goal = x[:, :-2], x[:, -2:]
-        goal_q = self.Q_goal(goal)
-        laser_k = self.K_laser(laser_info)
-        laser_v = self.V_laser(laser_info)
-        laser_embedding, _ = self.att_laser(goal_q, laser_k, laser_v)
-
-        laser_embedding = F.relu(laser_embedding)
-        mu = self.fc_mu(laser_embedding)
-        mu = F.sigmoid(mu)  # [b, n_hiddens] --> [b, n_actions] mu=[velocity, rotational velocity] * robots_num
-        std = self.fc_std(laser_embedding)  # [b, n_hiddens] --> [b, n_actions]
-        std = F.softplus(std)  # 值域 小于0的部分逼近0，大于0的部分几乎不变
-        return mu.squeeze(0), std.squeeze(0)
-
-
-class ValueNet(nn.Module):
-    def __init__(self, n_states, n_hiddens):
-        super(ValueNet, self).__init__()
-        self.fc1 = nn.Linear(n_states, n_hiddens)
-        self.fc2 = nn.Linear(n_hiddens, 1)
-
-    # 前向传播
-    def forward(self, x):
-        x = self.fc1(x)  # [b,n_states]-->[b,n_hiddens]
-        x = F.relu(x)
-        x = self.fc2(x)  # [b,n_hiddens]-->[b,1]
-        return x
 
 
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
@@ -57,9 +15,33 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     return layer
 
 
-class Agent(nn.Module):
+class SimpleAgent(nn.Module):
+    def __init__(self):
+        super(SimpleAgent, self).__init__()
+        self.hidden_size = 4
+        self.actor = nn.Sequential(nn.Linear(2, self.hidden_size), nn.ReLU(), nn.Linear(self.hidden_size, 2))
+        self.critic = nn.Sequential(nn.Linear(2, self.hidden_size), nn.ReLU(), nn.Linear(self.hidden_size, 1))
+        self.actor_logstd = nn.Parameter(torch.zeros(1, 2))
+
+    def get_deterministic_action(self, x):
+        return self.actor(x), self.critic(x)
+
+    def get_action_and_value(self, x, action=None):
+        action_mean = self.actor(x)
+        action_logstd = self.actor_logstd.expand_as(action_mean)
+        action_std = torch.exp(action_logstd)
+        probs = Normal(action_mean, action_std)
+        if action is None:
+            action = probs.sample()
+        return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
+
+    def get_value(self, x):
+        return self.critic(x)
+
+
+class AttentionAgent(nn.Module):
     def __init__(self, env):
-        super(Agent, self).__init__()
+        super(AttentionAgent, self).__init__()
         self.hidden_dim = 64
         self.critic = nn.Sequential(
             layer_init(nn.Linear(np.array(env.observation_space.shape).prod(), self.hidden_dim)),
@@ -90,6 +72,11 @@ class Agent(nn.Module):
             action = probs.sample()
         return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
 
+    def get_deterministic_action(self, x):
+        action_mean = self.actor_mean(x)
+        value = self.actor_mean(x)
+        return action_mean, value
+
 
 def parse_args():
     # fmt: off
@@ -98,7 +85,7 @@ def parse_args():
                         help="the name of this experiment")
     parser.add_argument("--gym-id", type=str, default="MyEnv-v0",
                         help="the id of the gym environment")
-    parser.add_argument("--learning-rate", type=float, default=2e-5,
+    parser.add_argument("--learning-rate", type=float, default=2e-4,
                         help="the learning rate of the optimizer")
     parser.add_argument("--seed", type=int, default=1,
                         help="seed of the experiment")
@@ -122,7 +109,7 @@ def parse_args():
                         help="the number of parallel game environments")
     parser.add_argument("--num-steps", type=int, default=648,
                         help="the number of steps to run in each environment per policy rollout")
-    parser.add_argument("--anneal-lr", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
+    parser.add_argument("--anneal-lr", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
                         help="Toggle learning rate annealing for policy and value networks")
     parser.add_argument("--gae", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
                         help="Use GAE for advantage computation")

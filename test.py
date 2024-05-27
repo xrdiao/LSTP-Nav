@@ -4,6 +4,8 @@ import numpy as np
 import gymnasium as gym
 import os
 import pybullet as p
+from rvo.vector import Vector2
+import rvo.math as rvo_math
 
 base_path = os.path.dirname(os.path.abspath(__file__))
 urdf_path = base_path + '/env_sim/utils/data/turtlebot.urdf'
@@ -13,7 +15,7 @@ device = torch.device('cuda') if torch.cuda.is_available() \
 
 
 def test():
-    render = True
+    render = False
     # env = gym.make('MyEnv-v0', render=render, urdf_path=urdf_path)
     env = MyEnv(render=render, urdf_path=urdf_path)
     p.resetDebugVisualizerCamera(cameraDistance=10, cameraYaw=0, cameraPitch=-89.9,
@@ -24,18 +26,19 @@ def test():
 
     print('robot_nums:', robot_nums)
     for i in range(robot_nums):
-        goal = [i, 0.3 + i]
+        goal = [i, 10]
 
         yaw = np.pi * robot_nums
-        ori = p.getQuaternionFromEuler([0, 0, np.pi/2], env.physics_client_id)
+        ori = p.getQuaternionFromEuler([0, 0, 0], env.physics_client_id)
         state = [i, 0, 0.01] + list(ori)
         env.add_robot(state, goal)
         # env.add_random_robot(lim=lim)
 
     agent = PPO(env, test_env=env)
     rewards = []
-    action = np.zeros([env.robots_num, 2])
-    # next_obs, _ = env.reset()
+    actions = np.zeros([env.robots_num, 2])
+    next_obs, _ = env.reset()
+    env.show_goal_point()
 
     # 只收集了一个机器人的rewards
     with torch.no_grad():
@@ -46,11 +49,17 @@ def test():
             while True:
                 for i, rob in enumerate(env.robots):
                     vel = rob.goto(rob.target_pos)
-                    action[i] = vel
 
-                next_obs, reward, te, tr, info_ = env.step(action)
+                    obs = rob.get_observation()
+                    v = obs['distance'] if obs['distance'][0] < 1 else [1]
+                    a = next_obs[i]
+                    print('obs:', a, 'vel',vel)
+
+                    actions[i] = vel
+
+                next_obs, reward, te, tr, info_ = env.step(actions)
                 r.append(reward)
-                done = env.check_done(te=te, tr=tr, lim=0)
+                done = env.check_done(te=te, tr=tr, lim=5)
                 # print('reward:', reward)
 
                 if np.array(done).all():
@@ -76,6 +85,7 @@ def main():
         env.add_random_robot(lim=lim)
 
     agent = PPO(env, test_env=env)
+    agent.load_model()
     agent.evaluate(debug=True)
 
 

@@ -3,6 +3,7 @@ import os
 import numpy as np
 
 from rl.model import PPO
+# from rl.model_discrete import PPO
 import gymnasium as gym
 import pybullet as p
 from env_sim.my_env import MyEnv
@@ -31,7 +32,7 @@ def main():
         env.show_goal_point()
         p.resetDebugVisualizerCamera(cameraDistance=3, cameraYaw=0, cameraPitch=-89.9,
                                      cameraTargetPosition=[0, 0, 0])
-    print('start train 1')
+    print('Start training PPO')
     agent.update(lim=lim)
 
 

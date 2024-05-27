@@ -58,12 +58,6 @@ class Robot(object):
         matrix = p.getMatrixFromQuaternion(baseOri)
         return [matrix[0], matrix[3], matrix[6]]
 
-    def __angle(self, v1, v2):
-        v1 = np.array(v1)
-        v2 = np.array(v2)
-        cosangle = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
-        return np.arccos(cosangle)
-
     def get_observation(self):  # 根据目的地的坐标得到机器人目前的状态
         assert self.target_pos is not None, "the goal of robot %d is not initialized" % self.client_id
 
@@ -71,27 +65,21 @@ class Robot(object):
         obs_dict = self.get_vel_and_pos()
         # 观测时同时更新当前时刻 （t） 机器人的位置，t 时刻的位置要用于计算 t 时刻距终点的距离
         vel, angular_vel, pos, ori = obs_dict['vel'], obs_dict['angular_vel'], obs_dict['pos'], obs_dict['ori']
+        self.cur_pos, self.cur_vel = list(pos), vel
 
-        vel = np.array(vel)
-        if self.cur_vel is None:
-            self.cur_acc = np.linalg.norm(vel)
-        else:
-            self.cur_acc = np.linalg.norm(vel - self.cur_vel)
+        # vel = np.array(vel)
+        # if self.cur_vel is None:
+        #     self.cur_acc = np.linalg.norm(vel)
+        # else:
+        #     self.cur_acc = np.linalg.norm(vel - self.cur_vel)
 
-        self.cur_pos = list(pos)
-        # print('cur_vel:{}, vel:{}, cur_acc:{}, pos:{}, del_action:{}'.format(self.cur_vel, vel, self.cur_acc,
-        # self.cur_pos, self.del_action))
-
-        self.cur_vel = vel
-        rot_matrix = p.getMatrixFromQuaternion(ori)  # rot_matrix[0], rot_matrix[3]分别代表着cos(theta)和sin(theta)
         # laser = self.ray_sensor()
         laser = []  # 暂时不考虑雷达
 
-        angle = self.__angle(
-            v1=[rot_matrix[0], rot_matrix[3]],
-            v2=[y - x for x, y in zip(pos[:2], self.target_pos)]
-        )
+        x_, y_ = self.target_pos[0] - pos[0], self.target_pos[1] - pos[1]
+        angle = self.follow_vector_angle([x_, y_])
         distance = np.linalg.norm(np.array(pos)[:2] - self.target_pos)
+
         return dict(laser=laser, distance=[distance], angle=[angle])
 
     def apply_action(self, action):  # 施加动作
@@ -164,34 +152,23 @@ class Robot(object):
                     p.addUserDebugLine(rayFromPos[index], rayToPos[index], [0, 1, 0], physicsClientId=self.client_id)
         return hit_position
 
+    def follow_vector_angle(self, vector):
+        x, y = self.get_forward_vector()[:2]
+        x_, y_ = vector[0], vector[1]
+        theta = np.arccos((x * x_ + y * y_) / (np.linalg.norm([x, y]) * np.linalg.norm([x_, y_]) + 1e-7))  # 向量点乘
+        signal = -1 if x_ * y - y_ * x > 0 else 1  # 叉乘
+        return signal * abs(theta)
+
     def goto(self, goal):
-        goal_x, goal_y = goal[0], goal[1]
         basePos = p.getBasePositionAndOrientation(self.robot, physicsClientId=self.client_id)
-        current_x = basePos[0][0]
-        current_y = basePos[0][1]
+        current_pos = basePos[0]
 
-        current_orientation = list(p.getEulerFromQuaternion(basePos[1]))[2]
-        goal_direction = math.atan2((goal_y - current_y), (goal_x - current_x))
-        if current_orientation < 0:
-            current_orientation = current_orientation + 2 * math.pi
-        if goal_direction < 0:
-            goal_direction = goal_direction + 2 * math.pi
+        x_, y_ = goal[0] - current_pos[0], goal[1] - current_pos[1]
+        angle = self.follow_vector_angle([x_, y_])
 
-        theta = goal_direction - current_orientation
-        if theta < 0 and abs(theta) > abs(theta + 2 * math.pi):
-            theta = theta + 2 * math.pi
-        elif theta > 0 and abs(theta - 2 * math.pi) < theta:
-            theta = theta - 2 * math.pi
-
-        k_linear = 10
-        k_angular = 30
-        linear = k_linear * math.cos(theta)
-        angular = k_angular * theta
-
-        # rightWheelVelocity = linear + angular
-        # leftWheelVelocity = linear - angular
-        # p.setJointMotorControl2(self.robot, 0, p.VELOCITY_CONTROL, targetVelocity=leftWheelVelocity, force=10)
-        # p.setJointMotorControl2(self.robot, 1, p.VELOCITY_CONTROL, targetVelocity=rightWheelVelocity, force=10)
+        distance = np.linalg.norm(np.array(goal) - np.array(current_pos[:2]))
+        linear = distance if distance < MAX_SPEED else MAX_SPEED
+        angular = angle
         return [linear, angular]
 
     def action2commend(self, action):

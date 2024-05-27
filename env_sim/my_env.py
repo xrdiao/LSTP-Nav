@@ -25,6 +25,8 @@ class MyEnv(gym.Env):
     def __init__(self, scene_name: str = "plane_static_obstacle-A", render: bool = False, evaluate: bool = False,
                  urdf_path: Optional[str] = 'utils/data/turtlebot.urdf'):
         self.time_step = 1. / 240.
+        self.max_simulate_steps = 10000
+        self.simulate_steps = 0
 
         self.random_mode = render
         self._physics_client_id = p.connect(p.GUI if self.random_mode else p.DIRECT)
@@ -41,7 +43,6 @@ class MyEnv(gym.Env):
 
         self.global_time = 0
         self.step_counter = 0
-        self.step_num = 0
         self.collision_num = 0
 
         self.robots_num = 0
@@ -88,53 +89,73 @@ class MyEnv(gym.Env):
     def check_done(self, te, tr, lim=5):
         assert len(te) == len(tr), "the length of te or tr are incorrect"
 
-        # 机器人都到达目标点时te为true
-        done_te = True
-        for i in range(len(te)):
-            if not te[i]:
-                done_te = False
-                break
+        # 到达最大仿真步数时，重置环境
+        if self.simulate_steps >= self.max_simulate_steps:
+            te = [True] * len(te)
+            self.reset(lim=lim, tr=tr, te=te)
+            done = [True] * len(te)
+        else:
+            # 机器人都到达目标点时te为true
+            done_te = True
+            for i in range(len(te)):
+                if not te[i]:
+                    done_te = False
+                    break
 
-        # 有机器人发生碰撞时tr为true
-        done_tr = False
-        for i in range(len(tr)):
-            if tr[i]:
-                done_tr = True
-                break
+            # 有机器人发生碰撞时tr为true
+            done_tr = False
+            for i in range(len(tr)):
+                if tr[i]:
+                    done_tr = True
+                    break
 
-        if done_te or done_tr:
-            a, _ = self.reset(lim=lim, tr=tr, te=te)
-        done = [i or j for i, j in zip(te, tr)]
+            if done_te or done_tr:
+                self.reset(lim=lim, tr=tr, te=te)
+            done = [i or j for i, j in zip(te, tr)]
         return done
 
-    def add_random_robot(self, lim=1):
+    def random_point(self, lim=5, seed=0):
+        '''
+        :param lim: range of the point
+        :param seed: 0 - init pos, 1- init goal
+        :return:
+        '''
+        point = None
+        done = False
+        while not done:
+            point = np.random.uniform(low=-lim, high=lim, size=2).tolist() + [0.01]
+            done = True
+
+            for obs in self.obstacles:
+                done = True and done if self.__distance(obs[:2], point[:2]) > (
+                        np.sqrt(2) + ROBOT_WIDTH + 0.1) else False and done
+
+            for rob in self.robots:
+                done = True and done if self.__distance(rob.cur_pos[:2], point[:2]) > (
+                        2 * ROBOT_WIDTH + 0.1) else False and done
+
+            if seed == 1:
+                for state in self.init_goal:
+                    done = True and done if self.__distance(state[:2],
+                                                            point[:2]) > 2.5 * ROBOT_WIDTH else False and done
+            elif seed == 0:
+                for state in self.init_state:
+                    done = True and done if self.__distance(state[:2],
+                                                            point[:2]) > 2.5 * ROBOT_WIDTH else False and done
+            if self.robots_num == 0:
+                break
+        return point
+
+    def add_random_robot(self, lim=5):
         '''
         Add a random robot to the environment
         :param lim: The range limit of the robot positions
         '''
-        done = False
-        while not done:
-            pos = np.random.uniform(low=-lim, high=lim, size=2).tolist() + [0.01]
-            angle = np.random.uniform(low=-np.pi, high=np.pi)
-            ori = list(p.getQuaternionFromEuler([0, 0, angle], self._physics_client_id))
+        pos = self.random_point(lim=lim, seed=0)
+        goal = self.random_point(lim=lim, seed=1)[:2]
 
-            done = True
-            # 判断随机放置的机器人是否会与已有机器人发生碰撞
-            for state in self.init_state:
-                done = True and done if self.__distance(state[:2], pos[:2]) > 2.5 * ROBOT_WIDTH else False and done
-
-            if self.robots_num == 0:
-                break
-
-        done = False
-        while not done:
-            goal = np.random.uniform(low=-lim, high=lim, size=2)
-            done = True
-            for state in self.init_goal:
-                done = True and done if self.__distance(state[:2], goal[:2]) > 2.5 * ROBOT_WIDTH else False and done
-
-            if self.robots_num == 0:
-                break
+        angle = np.random.uniform(low=-np.pi, high=np.pi)
+        ori = list(p.getQuaternionFromEuler([0, 0, angle], self._physics_client_id))
 
         robot = Robot(base_pos=pos, base_ori=ori, client_id=self._physics_client_id, urdf_path=self.urdf_path)
         robot.set_target_pos(goal)
@@ -149,9 +170,42 @@ class MyEnv(gym.Env):
 
     def checkCollision(self, robot_id, debug=True):
         # 也可以用距离判断
+        # for i, robot in enumerate(self.robots):
+        # if i != robot_id - 1 - len(self.obstacles):
+        # if np.linalg.norm(np.array(self.robots[i].cur_pos) - np.array(robot.cur_pos)) <= 2 * ROBOT_WIDTH:
+        #     self.collision_num += 1
+        #     if debug:
+        #         print(
+        #             "robot with id={} collides!, state:{}, physical id:{}, collision number:{}".format(robot_id,
+        #                                                                                                self.robots[
+        #                                                                                                    robot_id - 1 - len(
+        #                                                                                                        self.obstacles)].cur_pos,
+        #                                                                                                self._physics_client_id,
+        #                                                                                                self.collision_num))
+        #     return True
+        #     for obs in self.obstacles:
+        #         if np.linalg.norm(np.array(robot.cur_pos) - np.array(obs)) < ROBOT_WIDTH + np.sqrt(2):
+        #             self.collision_num += 1
+        #             if debug:
+        #                 print(
+        #                     "robot with id={} collides!, state:{}, physical id:{}, collision number:{}".format(
+        #                         robot_id,
+        #                         self.robots[
+        #                             robot_id - 1 - len(
+        #                                 self.obstacles)].cur_pos,
+        #                         self._physics_client_id,
+        #                         self.collision_num))
+        #             return True
+        # return False
         if p.getContactPoints(bodyA=robot_id, linkIndexA=-1, physicsClientId=self._physics_client_id):
+            self.collision_num += 1
             if debug:
-                print("robot with id={} collides!, state:{}, physical id:{}, collision number:{}".format(robot_id, self.robots[robot_id - 1].cur_pos, self._physics_client_id, self.collision_num))
+                print("robot with id={} collides!, state:{}, physical id:{}, collision number:{}".format(robot_id,
+                                                                                                         self.robots[
+                                                                                                             robot_id - 1 - len(
+                                                                                                                 self.obstacles)].cur_pos,
+                                                                                                         self._physics_client_id,
+                                                                                                         self.collision_num))
             return True
         return False
 
@@ -161,12 +215,12 @@ class MyEnv(gym.Env):
         te, tr = np.zeros_like(self.robots, dtype=bool), np.zeros_like(self.robots, dtype=bool)
 
         for i, rob in enumerate(self.robots):
-            obs_dict = rob.get_vel_and_pos()
-            angular_speed, acc = obs_dict['angular_vel'], obs_dict['acc']
+            # obs_dict = rob.get_vel_and_pos()
+            # angular_speed, acc = obs_dict['angular_vel'], obs_dict['acc']
 
             # 到达目标点奖励
             if rob.is_reachable():
-                # te[i] = True
+                te[i] = True
                 if not rob.reach_goal:
                     rg = ARRIVAL_REWARD
                     rob.reach_goal = True
@@ -184,18 +238,17 @@ class MyEnv(gym.Env):
             # 碰撞时惩罚
             if self.checkCollision(rob.robot):
                 rc = COLLISION_REWARD
-                self.collision_num += 1
                 tr[i] = True
             else:
                 rc = 0
 
             # 过大角速度时惩罚
-            rw = ANGULAR_VELOCITY_PENALTY * rob.del_angle if rob.del_angle > 0.3 else 0
+            rw = ANGULAR_VELOCITY_PENALTY * abs(rob.del_angle) if abs(rob.del_angle) > 0.5 else 0
             # ra = ACCELERATION_VELOCITY_PENALTY * abs(acc) if abs(acc) > 1000 else 0
-            rv = VELOCITY_PENALTY * rob.del_vel if abs(rob.del_vel) > 0.3 else 0
+            # rv = VELOCITY_PENALTY * rob.del_vel if abs(rob.del_vel) > 1000 else 0
 
             # print(rg, rw, rc, ra, r_action)
-            rewards.append(rg + rc + rw + rv)
+            rewards.append(rg + rc + rw)
 
         return rewards, te, tr
 
@@ -213,6 +266,7 @@ class MyEnv(gym.Env):
         assert self.robots_num == len(actions), 'incorrect number of the actions'
 
         self.global_time += self.time_step
+        self.simulate_steps += 1
 
         # 更新 t 时刻机器人距终点的距离
         for i, rob in enumerate(self.robots):
@@ -223,17 +277,9 @@ class MyEnv(gym.Env):
         for i, action in enumerate(actions):
             self.robots[i].apply_action(action)
 
-        # 判断是否到达终点
-        # for i, action in enumerate(actions):
-        #     if self.robots[i].is_reachable():
-        #         self.robots[i].apply_action([0, 0])
-        #     else:
-        #         self.robots[i].apply_action(action)
-
         # 为了让一个动作的作用更加明显，让同一个动作执行多次
         for _ in range(FPS):
             p.stepSimulation(physicsClientId=self._physics_client_id)
-        self.step_num += 1
 
         # 收集机器人观测量，计算奖励，t+1
         distances = []
@@ -255,20 +301,11 @@ class MyEnv(gym.Env):
         Reset the position of the robot
         '''
         if lim:
-            done = False
-            while not done:
-                pos = np.random.uniform(low=-lim, high=lim, size=2).tolist() + [0.01]
-                angle = np.random.uniform(low=-np.pi, high=np.pi)
-                ori = list(p.getQuaternionFromEuler([0, 0, angle], self._physics_client_id))
-
-                # 判断随机放置的机器人是否会与已有机器人发生碰撞
-                done = True
-                for rob in self.robots:
-                    state = rob.get_vel_and_pos()['pos']
-                    done = True and done if self.__distance(state[:2], pos[:2]) > 2.5 * ROBOT_WIDTH else False and done
-
+            pos = self.random_point(lim=lim, seed=0)
+            angle = np.random.uniform(low=-np.pi, high=np.pi)
+            ori = list(p.getQuaternionFromEuler([0, 0, angle], self._physics_client_id))
         else:
-            pos, ori = self.init_state[:3], self.init_state[3:]
+            pos, ori = self.init_state[idx][:3], self.init_state[idx][3:]
 
         p.resetBasePositionAndOrientation(self.robots[idx].robot, pos, ori, self._physics_client_id)
 
@@ -317,9 +354,10 @@ class MyEnv(gym.Env):
 
             robot_num = self.robots_num
 
-            self.step_num = 0
             self.collision_num = 0
             self.robots_num = 0
+            self.simulate_steps = 0
+            self.global_time = 0
 
             init_state = self.init_state.copy()
             init_goal = self.init_goal.copy()
@@ -327,6 +365,9 @@ class MyEnv(gym.Env):
             self.init_state.clear()
             self.init_goal.clear()
             self.robots.clear()
+
+            for obs in self.obstacles:
+                self.place_cube(obs)
 
             # reload robot
             if lim:
@@ -366,8 +407,12 @@ class MyEnv(gym.Env):
             p.disconnect(physicsClientId=self._physics_client_id)
         self._physics_client_id = -1
 
-    def place_cube(self, x, y, size=0.5):
-        self.obstacles.append(p.loadURDF("cube.urdf", [x, y, size], physicsClientId=self._physics_client_id))
+    def place_cube(self, position: list):
+        x, y = position[0], position[1]
+        assert self.robots_num == 0, 'must place obstacles first'
+        self.obstacles.append([x, y])
+        p.loadURDF("cube.urdf", [x, y, 0.5], physicsClientId=self._physics_client_id, useFixedBase=1,
+                   useMaximalCoordinates=1)
 
     @property
     def physics_client_id(self):
