@@ -115,11 +115,11 @@ class MyEnv(gym.Env):
         return done
 
     def random_point(self, lim=5, seed=0):
-        '''
+        """
         :param lim: range of the point
         :param seed: 0 - init pos, 1- init goal
         :return:
-        '''
+        """
         point = None
         done = False
         while not done:
@@ -147,10 +147,10 @@ class MyEnv(gym.Env):
         return point
 
     def add_random_robot(self, lim=5):
-        '''
-        Add a random robot to the environment
+        """
+        生成一个随机机器人
         :param lim: The range limit of the robot positions
-        '''
+        """
         pos = self.random_point(lim=lim, seed=0)
         goal = self.random_point(lim=lim, seed=1)[:2]
 
@@ -215,9 +215,6 @@ class MyEnv(gym.Env):
         te, tr = np.zeros_like(self.robots, dtype=bool), np.zeros_like(self.robots, dtype=bool)
 
         for i, rob in enumerate(self.robots):
-            # obs_dict = rob.get_vel_and_pos()
-            # angular_speed, acc = obs_dict['angular_vel'], obs_dict['acc']
-
             # 到达目标点奖励
             if rob.is_reachable():
                 te[i] = True
@@ -244,11 +241,8 @@ class MyEnv(gym.Env):
 
             # 过大角速度时惩罚
             rw = ANGULAR_VELOCITY_PENALTY * abs(rob.del_angle) if abs(rob.del_angle) > 0.5 else 0
-            # ra = ACCELERATION_VELOCITY_PENALTY * abs(acc) if abs(acc) > 1000 else 0
-            # rv = VELOCITY_PENALTY * rob.del_vel if abs(rob.del_vel) > 1000 else 0
-
-            # print(rg, rw, rc, ra, r_action)
-            rewards.append(rg + rc + rw)
+            rv = VELOCITY_PENALTY * rob.del_vel if abs(rob.del_vel) > 1000 else 0
+            rewards.append(rg + rc + rw + rv)
 
         return rewards, te, tr
 
@@ -257,18 +251,18 @@ class MyEnv(gym.Env):
         return np.linalg.norm(v1 - v2)
 
     def step(self, actions, FPS=1):
-        '''
-        :param actions: The actions of robots
-        :param FPS: The FPS of the actions
+        """
+        :param actions: [velocity, angular_vel]
+        :param FPS: 一个动作的持续帧率
         :return:
-        '''
+        """
         assert self.robots is not None, 'no robots loaded'
         assert self.robots_num == len(actions), 'incorrect number of the actions'
 
         self.global_time += self.time_step
         self.simulate_steps += 1
 
-        # 更新 t 时刻机器人距终点的距离
+        # 更新 t 时刻机器人距终点的距离，计算 t+1 和 t 时刻间的变化量
         for i, rob in enumerate(self.robots):
             rob.cur_dis = self.__distance(rob.cur_pos[:2], rob.target_pos[:2])
             rob.del_vel = abs(rob.cur_action[0] - actions[i][0])
@@ -281,11 +275,11 @@ class MyEnv(gym.Env):
         for _ in range(FPS):
             p.stepSimulation(physicsClientId=self._physics_client_id)
 
-        # 收集机器人观测量，计算奖励，t+1
+        # 收集 t+1 时刻机器人的观测量，计算奖励，
         distances = []
         current_state = []
         for i in range(self.robots_num):
-            obs = self.robots[i].get_observation()  # 获取 t+1 时刻的观测值，并且更新机器人记录的当前时刻位置
+            obs = self.robots[i].get_observation()  # 获取 t+1 时刻的观测值，并且更新机器人的本地记录
             laser = obs['laser']
             distance = obs['distance']
             angle = obs['angle']
@@ -297,9 +291,9 @@ class MyEnv(gym.Env):
         return np.array(current_state), reward, te, tr, info
 
     def reset_robot(self, idx: int, lim: int = 5):
-        '''
+        """
         Reset the position of the robot
-        '''
+        """
         if lim:
             pos = self.random_point(lim=lim, seed=0)
             angle = np.random.uniform(low=-np.pi, high=np.pi)
@@ -312,9 +306,9 @@ class MyEnv(gym.Env):
     def reset(self, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None, phase='train', test_case=None,
               tr: list = None, te: list = None, lim=5):
         """
-            - reset scene items
-            - reload robot
-            :param lim: range of the random position of the robots, 0 means the specified location
+            - 所有机器人到达目标点后重设场景
+            - 部分机器人发生碰撞后重设机器人
+            :param lim: 机器人随机生成的范围限制，0意味着按照初始值生成
         """
         assert self.robots is not None, 'no robots loaded'
 
@@ -395,12 +389,11 @@ class MyEnv(gym.Env):
             p.addUserDebugText('{}'.format(idx), pos, [1, 0, 0], 1, physicsClientId=self._physics_client_id)
 
     def render(self, mode='human'):
-
         pass
 
-    def seed(self, seed=None):
-        self.np_random, seed = gym.utils.seeding.np_random(seed)
-        return [seed]
+    # def seed(self, seed=None):
+    #     self.np_random, seed = gym.utils.seeding.np_random(seed)
+    #     return [seed]
 
     def close(self):
         if self._physics_client_id >= 0:
@@ -441,8 +434,7 @@ def createBoundaries(length, width):
 
 
 def main():
-    # env = MyEnv(render=True)
-    env = gym.make('MyEnv-v0', render=True)
+    env = MyEnv(render=True)
 
     robot_nums = 2
     lim = 5

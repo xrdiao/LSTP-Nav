@@ -15,17 +15,6 @@ urdf_path = base_path + '/env_sim/utils/data/turtlebot.urdf'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def reached_goal(simulator, goals):
-    """
-    Check if all agents have reached their goals.
-    """
-    for i in range(simulator.num_agents):
-        if rvo_math.abs_sq(simulator.agents_[i].position_ - goals[i]) > simulator.agents_[i].radius_ * \
-                simulator.agents_[i].radius_:
-            return False
-    return True
-
-
 def set_preferred_velocities(simulator, goals):
     for i in range(simulator.num_agents):
         goal_vector = goals[i] - simulator.agents_[i].position_
@@ -274,5 +263,5 @@ def test():
 
 
 if __name__ == '__main__':
-    train()
-    # test()
+    # train()
+    test()

@@ -8,6 +8,8 @@ from torch import nn
 from torch.distributions import Normal, Categorical
 from torch.nn import functional as F
 
+from env_sim.argument import LASER_NUM
+
 
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     torch.nn.init.orthogonal_(layer.weight, std)
@@ -43,39 +45,65 @@ class AttentionAgent(nn.Module):
     def __init__(self, env):
         super(AttentionAgent, self).__init__()
         self.hidden_dim = 64
-        self.critic = nn.Sequential(
-            layer_init(nn.Linear(np.array(env.observation_space.shape).prod(), self.hidden_dim)),
-            nn.Tanh(),
-            layer_init(nn.Linear(self.hidden_dim, self.hidden_dim)),
-            nn.Tanh(),
-            layer_init(nn.Linear(self.hidden_dim, 1), std=1.0),
-        )
-        self.actor_mean = nn.Sequential(
-            layer_init(nn.Linear(np.array(env.observation_space.shape).prod(), self.hidden_dim)),
-            nn.Tanh(),
-            layer_init(nn.Linear(self.hidden_dim, self.hidden_dim)),
-            nn.Tanh(),
-            layer_init(nn.Linear(self.hidden_dim, np.prod(env.action_space.shape)), std=0.1),
-        )
+
+        self.lstm_actor = nn.LSTM(input_size=LASER_NUM, hidden_size=self.hidden_dim, num_layers=3, batch_first=True)
+        self.lstm_actor_k = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.lstm_actor_v = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.att_actor = nn.MultiheadAttention(embed_dim=self.hidden_dim, num_heads=3, batch_first=True)
+        self.state_q_actor = nn.Linear(2, self.hidden_dim)
+
+        self.lstm_critic = nn.LSTM(input_size=LASER_NUM, hidden_size=self.hidden_dim, num_layers=3, batch_first=True)
+        self.lstm_critic_k = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.lstm_critic_v = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.att_critic = nn.MultiheadAttention(embed_dim=self.hidden_dim, num_heads=3, batch_first=True)
+        self.state_q_critic = layer_init(nn.Linear(2, self.hidden_dim))
+
+        self.decode_actor = nn.Linear(self.hidden_dim, 2)
+        self.decode_critic = nn.Linear(self.hidden_dim, 2)
+
+        self.fc_actor = nn.Linear(4, 2)
+        self.fc_critic = nn.Linear(4, 1)
+
         self.actor_logstd = nn.Parameter(torch.zeros(1, np.prod(env.action_space.shape)))
         self.action_bound = env.action_space.high[0]
 
-    def get_value(self, x):
-        return self.critic(x)
+    def get_value(self, laser, state):
+        laser, _ = self.lstm_critic(laser)
+        q = self.state_q_critic(state)
+        k = self.lstm_critic_k(laser)
+        v = self.lstm_critic_v(laser)
+        emb, emb_weights = self.att_critic(q, k, v)
+        decoder = F.relu(self.decode_critic(emb))
 
-    def get_action_and_value(self, x, action=None):
-        action_mean = self.actor_mean(x)
+        final_emb = torch.cat([decoder, state])
+        y = self.fc_critic(final_emb)
+        return y
+
+    def get_action(self, laser, state):
+        laser, _ = self.lstm_actor(laser)
+        q = self.state_q_actor(state)
+        k = self.lstm_actor_k(laser)
+        v = self.lstm_actor_v(laser)
+        emb, emb_weights = self.att_actor(q, k, v)
+        decoder = F.relu(self.decode_actor(emb))
+
+        final_emb = torch.cat([decoder, state])
+        y = self.fc_actor(final_emb)
+        return y
+
+    def get_action_and_value(self, laser, state, action=None):
+        action_mean = self.get_action(laser, state)
         action_logstd = self.actor_logstd.expand_as(action_mean)
         action_std = torch.exp(action_logstd)
         probs = Normal(action_mean, action_std)
         if action is None:
             action = probs.sample()
-        return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(x)
+        return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.get_value(laser, state)
 
-    def get_deterministic_action(self, x):
-        action_mean = self.actor_mean(x)
-        value = self.actor_mean(x)
-        return action_mean, value
+    def get_deterministic_action(self, laser, state):
+        action = self.get_action(laser, state)
+        value = self.get_value(laser, state)
+        return action, value
 
 
 def parse_args():
