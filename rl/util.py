@@ -24,6 +24,7 @@ class SimpleAgent(nn.Module):
         self.actor = nn.Sequential(nn.Linear(2, self.hidden_size), nn.ReLU(), nn.Linear(self.hidden_size, 2))
         self.critic = nn.Sequential(nn.Linear(2, self.hidden_size), nn.ReLU(), nn.Linear(self.hidden_size, 1))
         self.actor_logstd = nn.Parameter(torch.zeros(1, 2))
+        self.name = 'SimpleAgent'
 
     def get_deterministic_action(self, x):
         return self.actor(x), self.critic(x)
@@ -41,53 +42,99 @@ class SimpleAgent(nn.Module):
         return self.critic(x)
 
 
+class Agent(nn.Module):
+    def __init__(self):
+        super(Agent, self).__init__()
+        self.conv1_actor = nn.Conv1d(in_channels=3, out_channels=32, kernel_size=5, stride=2)
+        self.conv2_actor = nn.Conv1d(in_channels=32, out_channels=1, kernel_size=3, stride=2)
+        self.fc1_actor = nn.Linear(126, 124)
+        self.fc2_actor = nn.Linear(128, 2)
+
+        self.laser_actor = nn.Sequential(self.conv1_actor, nn.ReLU(), self.conv2_actor, nn.ReLU(), self.fc1_actor)
+
+        self.conv1_critic = nn.Conv1d(in_channels=3, out_channels=32, kernel_size=5, stride=2)
+        self.conv2_critic = nn.Conv1d(in_channels=32, out_channels=1, kernel_size=3, stride=2)
+        self.fc1_critic = nn.Linear(126, 124)
+        self.fc2_critic = nn.Linear(128, 1)
+
+        self.laser_critic = nn.Sequential(self.conv1_critic, nn.ReLU(), self.conv2_critic, nn.ReLU(), self.fc1_critic)
+        self.name = 'Agent'
+
+    def get_value(self, laser, state):
+        state = state.unsqueeze(1)
+        laser = self.laser_critic(laser)
+        data = torch.cat((laser, state), -1)
+        v = self.fc2_critic(data)
+        return v
+
+    def get_action(self, laser, state):
+        state = state.unsqueeze(1)
+        laser = self.laser_actor(laser)
+        data = torch.cat((laser, state), -1)
+        vel = self.fc2_actor(data)
+        return vel
+
+    def get_deterministic_action(self, laser, state):
+        action = self.get_action(laser, state)
+        value = self.get_value(laser, state)
+        return action, value
+
+
 class AttentionAgent(nn.Module):
     def __init__(self, env):
         super(AttentionAgent, self).__init__()
-        self.hidden_dim = 64
+        self.hidden_dim = 256
 
         self.lstm_actor = nn.LSTM(input_size=LASER_NUM, hidden_size=self.hidden_dim, num_layers=3, batch_first=True)
         self.lstm_actor_k = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.lstm_actor_v = nn.Linear(self.hidden_dim, self.hidden_dim)
-        self.att_actor = nn.MultiheadAttention(embed_dim=self.hidden_dim, num_heads=3, batch_first=True)
-        self.state_q_actor = nn.Linear(2, self.hidden_dim)
+        self.att_actor = nn.MultiheadAttention(embed_dim=self.hidden_dim, num_heads=2, batch_first=True)
+        self.state_q_actor = nn.Linear(4, self.hidden_dim)
 
         self.lstm_critic = nn.LSTM(input_size=LASER_NUM, hidden_size=self.hidden_dim, num_layers=3, batch_first=True)
         self.lstm_critic_k = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.lstm_critic_v = nn.Linear(self.hidden_dim, self.hidden_dim)
-        self.att_critic = nn.MultiheadAttention(embed_dim=self.hidden_dim, num_heads=3, batch_first=True)
-        self.state_q_critic = layer_init(nn.Linear(2, self.hidden_dim))
+        self.att_critic = nn.MultiheadAttention(embed_dim=self.hidden_dim, num_heads=2, batch_first=True)
+        self.state_q_critic = layer_init(nn.Linear(4, self.hidden_dim))
 
-        self.decode_actor = nn.Linear(self.hidden_dim, 2)
-        self.decode_critic = nn.Linear(self.hidden_dim, 2)
+        self.decode_actor = nn.Sequential(nn.Linear(self.hidden_dim, int(self.hidden_dim / 2)), nn.ReLU(),
+                                          nn.Linear(int(self.hidden_dim / 2), 2))
+        self.decode_critic = nn.Sequential(nn.Linear(self.hidden_dim, int(self.hidden_dim / 2)), nn.ReLU(),
+                                           nn.Linear(int(self.hidden_dim / 2), 2))
 
-        self.fc_actor = nn.Linear(4, 2)
-        self.fc_critic = nn.Linear(4, 1)
+        self.fc_actor = nn.Linear(6, 2)
+        self.fc_critic = nn.Linear(6, 1)
 
         self.actor_logstd = nn.Parameter(torch.zeros(1, np.prod(env.action_space.shape)))
         self.action_bound = env.action_space.high[0]
+        self.name = 'AttentionAgent'
 
     def get_value(self, laser, state):
         laser, _ = self.lstm_critic(laser)
+        laser = F.relu(laser[:, -1, :])
         q = self.state_q_critic(state)
         k = self.lstm_critic_k(laser)
         v = self.lstm_critic_v(laser)
         emb, emb_weights = self.att_critic(q, k, v)
-        decoder = F.relu(self.decode_critic(emb))
+        emb = F.relu(emb)
 
-        final_emb = torch.cat([decoder, state])
+        decoder = self.decode_critic(emb)
+        final_emb = torch.cat([decoder, state], dim=1)
         y = self.fc_critic(final_emb)
         return y
 
     def get_action(self, laser, state):
+
         laser, _ = self.lstm_actor(laser)
+        laser = F.relu(laser[:, -1, :])
         q = self.state_q_actor(state)
         k = self.lstm_actor_k(laser)
         v = self.lstm_actor_v(laser)
         emb, emb_weights = self.att_actor(q, k, v)
-        decoder = F.relu(self.decode_actor(emb))
+        emb = F.relu(emb)
 
-        final_emb = torch.cat([decoder, state])
+        decoder = F.relu(self.decode_actor(emb))
+        final_emb = torch.cat([decoder, state], dim=1)
         y = self.fc_actor(final_emb)
         return y
 

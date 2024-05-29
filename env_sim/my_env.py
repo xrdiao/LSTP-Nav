@@ -50,7 +50,7 @@ class MyEnv(gym.Env):
         self.TARGET_VELOCITY = TARGET_VELOCITY
         self.LASER_NUM = LASER_NUM
         self.LASER_LENGTH = LASER_LENGTH
-        self.MAX_DISTANCE = MAX_DISTANCE
+
 
         # 动作空间: 左轮速度， 右轮速度
         self.action_space = spaces.Box(
@@ -59,8 +59,9 @@ class MyEnv(gym.Env):
         )
         # 状态空间: laser1, ..., 5,   distance, alpha
         self.observation_space = spaces.Box(
-            low=np.array([0.] * self.LASER_NUM + [0., 0.], dtype=np.float32),
-            high=np.array([self.LASER_LENGTH + 1] * self.LASER_NUM + [self.MAX_DISTANCE, np.pi], dtype=np.float32),
+            low=np.array([0.] * self.LASER_NUM + [-MAX_DISTANCE, -np.pi*2] + [-MAX_SPEED, -MAX_ROTATION_SPEED], dtype=np.float32),
+            high=np.array([self.LASER_LENGTH + 1] * self.LASER_NUM + [MAX_DISTANCE, np.pi * 2] +
+                          [MAX_SPEED, MAX_ROTATION_SPEED], dtype=np.float32),
         )
 
         self.init_state = []
@@ -168,7 +169,7 @@ class MyEnv(gym.Env):
         self.init_state.append(state)
         self.init_goal.append(goal)
 
-    def checkCollision(self, robot_id, debug=True):
+    def checkCollision(self, robot_id, debug=False):
         # 也可以用距离判断
         # for i, robot in enumerate(self.robots):
         # if i != robot_id - 1 - len(self.obstacles):
@@ -280,11 +281,11 @@ class MyEnv(gym.Env):
         current_state = []
         for i in range(self.robots_num):
             obs = self.robots[i].get_observation()  # 获取 t+1 时刻的观测值，并且更新机器人的本地记录
-            laser = obs['laser']
-            distance = obs['distance']
-            angle = obs['angle']
-            current_state.append(laser + distance + angle)
-            distances.append(distance[0])
+            state = []
+            for key in obs:
+                state += obs[key]
+            current_state.append(state)
+            distances.append(obs['distance'][0])
         reward, te, tr = self.__reward_func(distances)
 
         info = {"distance": distances, "collision_num": self.collision_num}
@@ -332,10 +333,10 @@ class MyEnv(gym.Env):
 
             for i in range(self.robots_num):
                 obs = self.robots[i].get_observation()
-                laser = obs['laser']
-                distance = obs['distance']
-                angle = obs['angle']
-                current_state.append(laser + distance + angle)
+                state = []
+                for key in obs:
+                    state += obs[key]
+                current_state.append(state)
 
         elif te_done:
             # reset scene
@@ -373,10 +374,10 @@ class MyEnv(gym.Env):
 
             for i in range(robot_num):
                 obs = self.robots[i].get_observation()
-                laser = obs['laser']
-                distance = obs['distance']
-                angle = obs['angle']
-                current_state.append(laser + distance + angle)
+                state = []
+                for key in obs:
+                    state += obs[key]
+                current_state.append(state)
 
             self.show_goal_point()
         return np.array(current_state), dict()

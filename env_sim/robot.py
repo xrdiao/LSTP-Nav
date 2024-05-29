@@ -1,3 +1,5 @@
+from collections import deque
+
 import numpy as np
 import pybullet as p
 import math
@@ -26,6 +28,10 @@ class Robot(object):
         self.last_state = base_pos + base_ori
         self.clipv = partial(np.clip, a_min=-MAX_SPEED / ROBOT_WHEEL_RADIUS, a_max=MAX_SPEED / ROBOT_WHEEL_RADIUS)
         self.reach_goal = False
+
+        self.laser_buffer = deque(maxlen=3)
+        for _ in range(self.laser_buffer.maxlen):
+            self.laser_buffer.append([0.] * LASER_NUM)
 
         # 用于记录上一时刻的数据
         self.cur_dis = 0
@@ -65,7 +71,9 @@ class Robot(object):
         vel, angular_vel, pos, ori = obs_dict['vel'], obs_dict['angular_vel'], obs_dict['pos'], obs_dict['ori']
         self.cur_pos, vel = list(pos), list(vel)
 
-        laser = []  # 暂时不考虑雷达
+        # 雷达信号缓存
+        laser = self.ray_sensor()
+        self.laser_buffer.append(laser)
 
         x_, y_ = self.target_pos[0] - pos[0], self.target_pos[1] - pos[1]
         angle = self.follow_vector_angle([x_, y_])
@@ -94,7 +102,7 @@ class Robot(object):
             physicsClientId=self.client_id
         )
 
-    def ray_sensor(self, showRay=False):
+    def ray_sensor(self, showRay=False, reversed_ray=True):
         """
         函数功能: 添加单线激光射线传感器，用于检测障碍物
         """
@@ -121,7 +129,10 @@ class Robot(object):
                               start[2]] for i in range(rayNum)])
         results = p.rayTestBatch(rayFromPos, rayToPos, self.client_id)  # 激光射线函数 返回被命中对象id、命中对象连杆索引（base连杆为-1）
 
-        hit_position = [result[2] * rayLength for result in results]
+        if reversed_ray:
+            hit_position = [LASER_LENGTH - result[2] * rayLength for result in results]
+        else:
+            hit_position = [result[2] * rayLength for result in results]
 
         # 将激光射线可视化，没有命中障碍物的射线为红色，命中障碍物的射线为绿色
         if showRay:

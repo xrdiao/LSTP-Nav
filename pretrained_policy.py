@@ -1,3 +1,8 @@
+import copy
+from collections import deque
+
+import torch
+
 from rl.model import *
 import numpy as np
 
@@ -38,15 +43,23 @@ def obs2simulator(position: list):
 def evaluate(test_env, agent, steps: int = 3000, times: int = 3, lim: int = 5, debug: bool = False):
     rewards = []
     next_obs, _ = test_env.reset()
+    next_obs = torch.Tensor(next_obs).to(device)
 
     with torch.no_grad():
         for _ in range(times):
             r = []
 
             for step in range(steps):
-                action, value = agent.get_deterministic_action(torch.Tensor(next_obs).to(device))
+                laser_datas = []
+                for rob in test_env.robots:
+                    laser_data = [i for i in rob.laser_buffer]
+                    laser_datas.append(torch.Tensor(laser_data).to(device))
+                laser_datas = torch.stack(laser_datas)
 
+                action, value = agent.get_deterministic_action(laser_datas, next_obs[:, -4:])
+                action = action.squeeze(1)
                 next_obs, reward, te, tr, info_ = test_env.step(action.cpu().numpy())
+                next_obs = torch.Tensor(next_obs).to(device)
                 r.append(reward)
                 done = test_env.check_done(te=te, tr=tr, lim=lim)
                 if debug:
@@ -116,7 +129,7 @@ def train():
     # simulator.process_obstacles()
 
     # 放置机器人
-    robots_num = 1
+    robots_num = 10
     lim = 5
     for _ in range(robots_num):
         test_env.add_random_robot(lim=lim)
@@ -128,17 +141,18 @@ def train():
     for rob in env.robots:
         simulator.add_agent(Vector2(rob.init_pos[0], rob.init_pos[1]))
 
+    # ---------------策略设置---------------
+    agent = AttentionAgent(env).to(device)
+    # agent = Agent().to(device)
+    optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
+
     # ---------------添加Writer---------------
-    run_name = f"pretrained_policy"
+    run_name = f"pretrained_policy" + agent.name
     writer = SummaryWriter(f"runs/{run_name}")
     writer.add_text(
         "hyperparameters",
         "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
     )
-
-    # ---------------策略设置---------------
-    agent = SimpleAgent().to(device)
-    optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
     # ---------------训练前准备---------------
     global_step = 0
@@ -147,6 +161,7 @@ def train():
     rewards = torch.zeros((args.num_steps, robots_num)).to(device)
     dones = torch.zeros((args.num_steps, robots_num)).to(device)
     values = torch.zeros((args.num_steps, robots_num)).to(device)
+    lasers = torch.zeros((args.num_steps, robots_num) + (3, LASER_NUM)).to(device)
 
     obs_, _ = env.reset()
     next_obs = torch.Tensor(obs_).to(device)
@@ -178,13 +193,20 @@ def train():
 
             # 执行orca的策略
             with torch.no_grad():
-                _, value = agent.get_deterministic_action(next_obs)
+                laser_datas = []
+                for rob in env.robots:
+                    laser_data = [i for i in rob.laser_buffer]
+                    laser_datas.append(torch.Tensor(laser_data).to(device))
+                laser_datas = torch.stack(laser_datas)
+                value = agent.get_value(laser_datas, next_obs[:, -4:])
                 values[step] = value.flatten()
 
             a = get_orca_vel(env, simulator, goals)
             actions[step] = torch.Tensor(a).to(device)
+            lasers[step] = laser_datas
 
             next_obs, reward, te, tr, info = step_both(env, a, simulator)
+
             done = env.check_done(te=te, tr=tr, lim=lim)
             rewards[step] = torch.tensor(reward).to(device).view(-1)
             next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(done).to(device)
@@ -195,7 +217,12 @@ def train():
                     goals[i] = Vector2(rob.target_pos[0], rob.target_pos[1])
 
         with torch.no_grad():
-            next_value = agent.get_value(next_obs).reshape(1, -1)
+            laser_datas = []
+            for rob in env.robots:
+                laser_data = [i for i in rob.laser_buffer]
+                laser_datas.append(torch.Tensor(laser_data).to(device))
+            laser_datas = torch.stack(laser_datas)
+            next_value = agent.get_value(laser_datas, next_obs[:, -4:]).reshape(1, -1)
             targets = torch.zeros_like(rewards).to(device)
 
             for t in reversed(range(args.num_steps)):
@@ -212,6 +239,7 @@ def train():
         b_obs = obs.reshape((-1,) + env.observation_space.shape)
         b_actions = actions.reshape((-1,) + env.action_space.shape)
         b_targets = targets.reshape(-1)
+        b_lasers = lasers.reshape((-1,) + (3, LASER_NUM))
         b_inds = np.arange(args.batch_size)
 
         for epoch in range(args.update_epochs):
@@ -221,7 +249,7 @@ def train():
                 mb_inds = b_inds[start:end]
 
                 # 策略用监督学习的方法训练（也可以理解成模仿学习，但我不知道模仿学习是什么流程），值函数用DQN
-                action, value = agent.get_deterministic_action(b_obs[mb_inds])
+                action, value = agent.get_deterministic_action(b_lasers[mb_inds], b_obs[mb_inds][:, -4:])
                 pg_loss = F.mse_loss(action, b_actions[mb_inds])
                 v_loss = F.mse_loss(value, b_targets[mb_inds])
                 loss = pg_loss + args.vf_coef * v_loss
@@ -239,21 +267,20 @@ def train():
             "bestTestReward": f'{max_reward:.2f}'
         })
 
-        torch.save(agent.state_dict(), 'pre_agent.pth')
+        torch.save(agent.state_dict(), agent.name + '.pth')
         if max_reward < test_reward:
             max_reward = test_reward
-            print('\nupdate agent with test reward:{}'.format(test_reward))
-            torch.save(agent.state_dict(), 'pre_agent_best_test.pth')
+            print('\nbest test reward:{}'.format(test_reward))
 
 
 def test():
     env = MyEnv(render=True, urdf_path=urdf_path)
     p.resetDebugVisualizerCamera(cameraDistance=10, cameraYaw=0, cameraPitch=-89.9,
                                  cameraTargetPosition=[0, 0, 0])
-    robots_num = 1
+    robots_num = 5
     lim = 5
-    agent = SimpleAgent().to(device)
-    agent.load_state_dict(torch.load('pre_agent.pth'))
+    agent = AttentionAgent(env).to(device)
+    agent.load_state_dict(torch.load(agent.name+'.pth'))
 
     for _ in range(robots_num):
         env.add_random_robot(lim=lim)

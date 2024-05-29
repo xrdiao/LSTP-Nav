@@ -66,22 +66,22 @@ def test():
     #     simulator.add_obstacle(obs)
     # simulator.process_obstacles()
 
-    robot_nums = 1
+    robot_nums = 10
     lim = 5
 
-    # for i in range(robot_nums):
-    #     env.add_random_robot(lim=lim)
-
     for i in range(robot_nums):
-        goal = [i, i]
-        ori = p.getQuaternionFromEuler([0, 0, np.pi / 2], env.physics_client_id)
-        state = [i, 0, 0.01] + list(ori)
-        env.add_robot(state, goal)
+        env.add_random_robot(lim=lim)
+
+    # for i in range(robot_nums):
+    #     goal = [i, i]
+    #     ori = p.getQuaternionFromEuler([0, 0, np.pi / 2], env.physics_client_id)
+    #     state = [i, 0, 0.01] + list(ori)
+    #     env.add_robot(state, goal)
 
     env.show_goal_point()
 
     goals = []
-    simulator.set_agent_defaults(15.0, 10, 10.0, 10.0, ROBOT_WIDTH + 0.1, MAX_SPEED, Vector2(0.0, 0.0))
+    simulator.set_agent_defaults(4.0, 10, 10.0, 10.0, ROBOT_WIDTH + 0.1, MAX_SPEED, Vector2(0.0, 0.0))
 
     for rob in env.robots:
         simulator.add_agent(Vector2(rob.init_pos[0], rob.init_pos[1]))
@@ -89,7 +89,6 @@ def test():
 
     while True:
         # while True:
-
         set_preferred_velocities(simulator, goals)
 
         # get action from 2D simulator
@@ -112,12 +111,11 @@ def test():
         # update pybullet
         next_obs, reward, te, tr, info = env.step(actions)
         done = env.check_done(te=te, tr=tr, lim=lim)
-        print(done)
+        # print(next_obs[0,:-2])
         for i, d in enumerate(done):
             if d:
                 rob = env.robots[i]
                 goals[i] = Vector2(rob.target_pos[0], rob.target_pos[1])
-
 
         # update simulator
         for agentNo, agent in enumerate(env.robots):
