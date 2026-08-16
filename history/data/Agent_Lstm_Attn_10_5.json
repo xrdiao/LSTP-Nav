@@ -1,0 +1,22 @@
+{
+    "avg_rewards": 102.32010323507996,
+    "collision_rate": 0.01,
+    "reach_rate": 0.99,
+    "trap_rate": 0.0,
+    "avg_time": 43.10206656171629,
+    "avg_step": 2118.1727272513317,
+    "var_avg_rewards": 16.531282848645994,
+    "var_reach_rate": 0.0001329798168083822,
+    "var_trap_rate": 0.0,
+    "var_collision_rate": 0.00013297981680838208,
+    "var_avg_time": 1.1579996608703162,
+    "var_avg_step": 1335.003930163098,
+    "agent_name": "Agent_Lstm_Attn",
+    "env_name": "circle",
+    "test_times": 100,
+    "obstacles": 5,
+    "laser_num": 130,
+    "robots_num": 10,
+    "x_lim": 10,
+    "y_lim": 10
+}

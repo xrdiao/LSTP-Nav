@@ -1,0 +1,16 @@
+{
+    "avg_rewards": -283.47355482928305,
+    "collision_rate": 0.37,
+    "reach_rate": 0.6285,
+    "trap_rate": 0.0015,
+    "avg_time": 108.72324952457097,
+    "avg_step": 1799.3221957040573,
+    "agent_name": "Agent_Lstm",
+    "env_name": "circle",
+    "test_times": 100,
+    "obstacles": 20,
+    "laser_num": 130,
+    "robots_num": 20,
+    "x_lim": 10,
+    "y_lim": 10
+}

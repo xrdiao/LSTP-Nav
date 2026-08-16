@@ -1,0 +1,2 @@
+                state = [2.5, -2.5] + [BIAS_ROBOT_LOCATION] + list(ori)
+                self.add_robot(state, [-5, 9])

@@ -1,0 +1,16 @@
+{
+    "avg_rewards": 4498.684896666666,
+    "collision_rate": 0.04683333333333333,
+    "reach_rate": 0.9478333333333333,
+    "trap_rate": 0.005333333333333333,
+    "avg_time": 37.28314406489873,
+    "avg_step": 1805.9423245999649,
+    "agent_name": "AttentionAgent",
+    "env_name": "circle",
+    "test_times": 1000,
+    "obstacles": 5,
+    "laser_num": 72,
+    "robots_num": 6,
+    "x_lim": 5,
+    "y_lim": 5
+}

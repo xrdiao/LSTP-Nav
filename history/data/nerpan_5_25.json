@@ -1,0 +1,14 @@
+{
+    "avg_rewards": -211.30403988343838,
+    "collision_rate": 0.008,
+    "reach_rate": 0.448,
+    "trap_rate": 0.544,
+    "avg_time": 582.1933460512331,
+    "avg_step": 1472.4642857142858,
+    "agent_name": "neupan",
+    "env_name": "circle",
+    "test_times": 50,
+    "obstacles": 25,
+    "laser_num": 100,
+    "robots_num": 5
+}

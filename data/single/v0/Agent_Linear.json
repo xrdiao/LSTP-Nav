@@ -1,0 +1,10 @@
+{
+    "avg_rewards": 32.300996000000005,
+    "collision_rate": 0.024,
+    "reach_rate": 0.672,
+    "trap_rate": 0.304,
+    "avg_time": 3.1104962005615233,
+    "agent_name": "Agent_Linear",
+    "env_name": "base",
+    "test_times": 250
+}

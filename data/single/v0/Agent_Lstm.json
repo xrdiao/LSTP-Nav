@@ -1,0 +1,10 @@
+{
+    "avg_rewards": 35.585892,
+    "collision_rate": 0.26,
+    "reach_rate": 0.74,
+    "trap_rate": 0.0,
+    "avg_time": 2.5374786500930786,
+    "agent_name": "Agent_Lstm",
+    "env_name": "base",
+    "test_times": 250
+}

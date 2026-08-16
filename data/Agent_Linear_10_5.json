@@ -1,0 +1,22 @@
+{
+    "avg_rewards": -25.408117678474547,
+    "collision_rate": 0.297,
+    "reach_rate": 0.703,
+    "trap_rate": 0.0,
+    "avg_time": 24.537641266152264,
+    "avg_step": 1369.9672830530587,
+    "var_avg_rewards": 28307.66763114587,
+    "var_reach_rate": 0.0008092016231336673,
+    "var_trap_rate": 0.0,
+    "var_collision_rate": 0.0008092016231336673,
+    "var_avg_time": 0.036844901055866346,
+    "var_avg_step": 33.0679878630942,
+    "agent_name": "Agent_Linear",
+    "env_name": "circle",
+    "test_times": 100,
+    "obstacles": 5,
+    "laser_num": 130,
+    "robots_num": 10,
+    "x_lim": 10,
+    "y_lim": 10
+}

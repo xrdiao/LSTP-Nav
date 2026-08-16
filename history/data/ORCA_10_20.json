@@ -1,0 +1,16 @@
+{
+    "avg_rewards": NaN,
+    "collision_rate": 0.261,
+    "reach_rate": 0.5316,
+    "trap_rate": 0.2074,
+    "avg_time": 63.161502172513764,
+    "avg_step": 1910.8073739581987,
+    "agent_name": "orca",
+    "env_name": "circle",
+    "test_times": 500,
+    "obstacles": 20,
+    "laser_num": 130,
+    "robots_num": 10,
+    "x_lim": 10,
+    "y_lim": 10
+}

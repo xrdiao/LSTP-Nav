@@ -1,0 +1,15 @@
+{
+    "avg_rewards": 45.42667199999999,
+    "collision_rate": 0.02,
+    "reach_rate": 0.976,
+    "trap_rate": 0.004,
+    "avg_time": 9.526877313613891,
+    "agent_name": "Agent_Lag",
+    "env_name": "base",
+    "test_times": 250,
+    "obstacles": 12,
+    "laser_num": 180,
+    "robots_num": 1,
+    "x_lim": 5,
+    "y_lim": 5
+}

@@ -1,0 +1,22 @@
+{
+    "avg_rewards": -110.34543783687586,
+    "collision_rate": 0.096,
+    "reach_rate": 0.89,
+    "trap_rate": 0.014,
+    "avg_time": 14.958049638283448,
+    "avg_step": 1398.1235954741994,
+    "var_avg_rewards": 307486.3678317121,
+    "var_reach_rate": 0.00025227186851676733,
+    "var_trap_rate": 9.209561764652505e-05,
+    "var_collision_rate": 0.00034669189934298316,
+    "var_avg_time": 0.10120800661826934,
+    "var_avg_step": 60.862125357535405,
+    "agent_name": "orca",
+    "env_name": "circle",
+    "test_times": 100,
+    "obstacles": 5,
+    "laser_num": 130,
+    "robots_num": 5,
+    "x_lim": 10,
+    "y_lim": 10
+}
