@@ -10,6 +10,8 @@ In the reported experiments, LSTP-Nav reaches **98.6%–100.0% success rates in 
 
 The repository also includes several comparison methods under [`compare_methods/`](./compare_methods), together with unified evaluation, plotting, and artifact management.
 
+Project website: [https://sites.google.com/view/lstp-nav](https://sites.google.com/view/lstp-nav)
+
 ## Repository Layout
 
 ```text
