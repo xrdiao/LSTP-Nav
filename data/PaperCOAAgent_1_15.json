@@ -5,12 +5,6 @@
     "trap_rate": 0.0,
     "avg_time": 5.6568133753841785,
     "avg_step": 1706.019999829398,
-    "var_avg_rewards": 0.013086278327862966,
-    "var_reach_rate": 0.0,
-    "var_trap_rate": 0.0,
-    "var_collision_rate": 0.0,
-    "var_avg_time": 0.19118020721702186,
-    "var_avg_step": 818.6869147051771,
     "agent_name": "PaperCOAAgent",
     "env_name": "circle",
     "test_times": 100,
@@ -18,5 +12,11 @@
     "laser_num": 130,
     "robots_num": 1,
     "x_lim": 10.0,
-    "y_lim": 10.0
+    "y_lim": 10.0,
+    "var_avg_rewards": 0.013086278327862966,
+    "var_reach_rate": 0.0,
+    "var_trap_rate": 0.0,
+    "var_collision_rate": 0.0,
+    "var_avg_time": 0.19118020721702186,
+    "var_avg_step": 818.6869147051771
 }

@@ -5,12 +5,6 @@
     "trap_rate": 0.0,
     "avg_time": 3100.1401386404727,
     "avg_step": 7351.238636299378,
-    "var_avg_rewards": 546.9147157076347,
-    "var_reach_rate": 0.00020065731705876818,
-    "var_trap_rate": 0.0,
-    "var_collision_rate": 0.00020065731705876797,
-    "var_avg_time": 1675.5300841906599,
-    "var_avg_step": 2184.6624436736083,
     "agent_name": "Agent_Lstm_Attn",
     "env_name": "circle",
     "test_times": 10,
@@ -18,5 +12,11 @@
     "laser_num": 130,
     "robots_num": 200,
     "x_lim": 10,
-    "y_lim": 10
+    "y_lim": 10,
+    "var_avg_rewards": 546.9147157076347,
+    "var_reach_rate": 0.00020065731705876818,
+    "var_trap_rate": 0.0,
+    "var_collision_rate": 0.00020065731705876797,
+    "var_avg_time": 1675.5300841906599,
+    "var_avg_step": 2184.6624436736083
 }

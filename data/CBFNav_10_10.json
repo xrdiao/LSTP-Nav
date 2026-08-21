@@ -10,14 +10,7 @@
     "TR": 0.052,
     "AT": 342.62003528515396,
     "AS": 1576.6747966197827,
-    "var_avg_rewards": 747043.5245190802,
-    "var_reach_rate": 0.0006456924505224017,
-    "var_trap_rate": 0.00020699504411587764,
-    "var_collision_rate": 0.0008711642070732892,
-    "var_avg_time": 671.3867052300737,
-    "var_avg_step": 1412.137129674567,
     "avg_solve_time_ms": 16.029390096265526,
-    "var_solve_time_ms": 407.9750435713737,
     "solve_failures": 190396,
     "agent_name": "CBFNav",
     "env_name": "circle",
@@ -26,5 +19,12 @@
     "laser_num": 130,
     "robots_num": 10,
     "x_lim": 10.0,
-    "y_lim": 10.0
+    "y_lim": 10.0,
+    "var_avg_rewards": 747043.5245190802,
+    "var_reach_rate": 0.0006456924505224017,
+    "var_trap_rate": 0.00020699504411587764,
+    "var_collision_rate": 0.0008711642070732892,
+    "var_avg_time": 671.3867052300737,
+    "var_avg_step": 1412.137129674567,
+    "var_solve_time_ms": 407.9750435713737
 }

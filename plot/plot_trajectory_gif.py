@@ -234,7 +234,7 @@ def main():
         "--trail-length",
         type=int,
         default=None,
-        help="Only keep the latest N frames as the visible trajectory. Default keeps the full history.",
+        help="Only keep the latest N frames as the visible trajectory.",
     )
     parser.add_argument(
         "--end-hold-seconds",

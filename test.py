@@ -5,7 +5,7 @@ from train import create_env
 
 from evaluator import Evaluator
 
-agent_id = 0
+agent_id = -1
 
 stack_laser = True
 if agent_id == 1:
@@ -38,8 +38,8 @@ def main(robot_num=1, obs_num=15):
     env.close()
 
 if __name__ == '__main__':
-    obstacles_num = [5,10,15,20,25,30,35]
-    robot_nums = [1,5,10]
+    obstacles_num = [35]
+    robot_nums = [10]
     for robot_num_ in robot_nums:
         for obs_num_ in obstacles_num:
             main(robot_num=robot_num_,obs_num=obs_num_)

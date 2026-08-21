@@ -10,14 +10,7 @@
     "TR": 0.45,
     "AT": 74.63134034579942,
     "AS": 2830.381817613203,
-    "var_avg_rewards": 66982.17723231488,
-    "var_reach_rate": 0.00447337873616265,
-    "var_trap_rate": 0.004473378736162649,
-    "var_collision_rate": 0.0,
-    "var_avg_time": 127.82669116782311,
-    "var_avg_step": 184854.74360920666,
     "avg_solve_time_ms": 23.300202441003098,
-    "var_solve_time_ms": 1.2348032020856663,
     "solve_failures": 442006,
     "agent_name": "SICNav",
     "env_name": "circle",
@@ -26,5 +19,12 @@
     "laser_num": 130,
     "robots_num": 1,
     "x_lim": 10.0,
-    "y_lim": 10.0
+    "y_lim": 10.0,
+    "var_avg_rewards": 66982.17723231488,
+    "var_reach_rate": 0.00447337873616265,
+    "var_trap_rate": 0.004473378736162649,
+    "var_collision_rate": 0.0,
+    "var_avg_time": 127.82669116782311,
+    "var_avg_step": 184854.74360920666,
+    "var_solve_time_ms": 1.2348032020856663
 }

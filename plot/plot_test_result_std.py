@@ -235,18 +235,13 @@ def plot_all_agents_one_subplot(
     fig.savefig("./fig/comparison_plot.png", dpi=300, bbox_inches="tight", pad_inches=0.05)
 
 if __name__ == "__main__":
-    # 从 history/data 读取各参数对应数值；从 data 读取方差（var_*）
-    history_dir = "/home/oem/direction_based_obstacle_avoidance/history/data"
-    var_dir = "/home/oem/direction_based_obstacle_avoidance/data"
+    # 根目录 data 中同时保存均值字段和方差字段（var_*）。
+    data_dir = "/home/oem/direction_based_obstacle_avoidance/data"
+    data_list = load_all_json(data_dir)
 
-    history_list = load_all_json(history_dir)
-    var_list = load_all_json(var_dir)
-
-    # data 目录中的 json 同时包含均值与方差，这里与 history/data 合并，
-    # 避免某些方法只存在于 data/ 中时无法被绘制。
-    table, robots_nums, agents = build_table(history_list, METRICS)
+    table, robots_nums, agents = build_table(data_list, METRICS)
     VAR_METRICS = ["var_" + m for m in METRICS]
-    var_table, _, _ = build_table(var_list, VAR_METRICS)
+    var_table, _, _ = build_table(data_list, VAR_METRICS)
 
     selected_robots_nums = [robot_num for robot_num in PLOT_ROBOTS if robot_num in robots_nums]
 
