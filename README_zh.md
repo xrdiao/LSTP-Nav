@@ -166,6 +166,123 @@ python -m scripts.benchmark_policy_frequency
 python -m scripts.visualize_laser_buffer --help
 ```
 
+## 训练参数修改位置
+
+对于主 LSTP-Nav PPO 训练链路，训练参数主要分布在下面几个位置。
+
+### 1. 任务设置与环境难度
+
+优先修改 [`train.py`](./train.py) 里的 `create_env()`。
+
+这里最常改的是：
+
+- `name`：环境类型，例如 `circle`、`u`、`dumbbell`、`room`
+- `robot_num`：机器人数量
+- `obstacle_num`：随机障碍物数量
+- `radius`：初始部署半径
+- `x_lim`、`y_lim`：障碍物采样范围
+- `x_range`、`y_range`：机器人队形展开范围 / 地图尺度
+- `render`：是否开启 PyBullet 渲染
+- `robot_camera`：是否启用机器人相机
+
+当前训练入口实际调用的是：
+
+```python
+env, env_arg = create_env(render=False)
+agent = PPO(env, policy="AttentionAgent")
+```
+
+### 2. 环境参数默认值
+
+修改 [`env_sim/env_util.py`](./env_sim/env_util.py) 里的 `env_args(...)`。
+
+这个解析器定义了环境相关默认参数，包括：
+
+- `--robots-num`
+- `--random-obstacles`
+- `--x-lim`、`--y-lim`
+- `--x-range`、`--y-range`
+- `--radius`
+- `--control-rate`
+- `--name`
+- `--ori-reward`
+- `--random-angle-obs`
+- `--robot-camera`
+
+如果你想改默认解析值，而不是直接在 `train.py` 写死，改这里更合适。
+
+### 3. PPO 超参数
+
+修改 [`rl/util_raw.py`](./rl/util_raw.py) 里的 `parse_args(...)`。
+
+主 PPO 的超参数在这里定义，常改项包括：
+
+- `--learning-rate`
+- `--total-timesteps`
+- `--num-steps`
+- `--num-minibatches`
+- `--update-epochs`
+- `--gamma`
+- `--gae-lambda`
+- `--clip-coef`
+- `--ent-coef`
+- `--vf-coef`
+- `--max-grad-norm`
+- `--target-kl`
+- `--cuda`
+
+这些参数会在 [`rl/model_raw.py`](./rl/model_raw.py) 的 `PPO.__init__(...)` 中被读取。
+
+### 4. 策略网络结构
+
+修改 [`rl/util_raw.py`](./rl/util_raw.py)。
+
+主策略类都定义在这里：
+
+- `AttentionAgent`
+- `LstmAgent`
+- `IJRRAgent`
+- `LinearAgent`
+
+常见会改的内容有：
+
+- GRU 隐层维度
+- GRU 层数
+- attention head 数量
+- actor / critic 隐层维度
+- 与 `LASER_NUM` 绑定的 LiDAR 输入维度
+
+如果你修改 LiDAR 维度，至少同步检查：
+
+- [`env_sim/argument.py`](./env_sim/argument.py)
+- [`rl/util_raw.py`](./rl/util_raw.py)
+
+### 5. 输出、权重与日志位置
+
+如果你想改训练输出位置，修改 [`project_paths.py`](./project_paths.py)。
+
+主训练链路当前默认写到：
+
+- 权重：[`artifacts/model/`](./artifacts/model)
+- TensorBoard 日志：[`artifacts/runs/`](./artifacts/runs)
+- 评测 json：[`artifacts/data/`](./artifacts/data)
+
+### 6. 对比方法参数
+
+对比方法不要改 `train.py`，而是改它们各自的配置文件：
+
+- DRL-VO：[`compare_methods/drlvo/config.py`](./compare_methods/drlvo/config.py)
+- VUCA-Nav：[`compare_methods/vuca_nav/config.py`](./compare_methods/vuca_nav/config.py)
+
+这些文件通常包含：
+
+- 机器人 / 障碍物数量
+- LiDAR 维度
+- 策略网络维度
+- reward 系数
+- 训练步长
+- checkpoint 与日志目录
+
 ## 输出位置
 
 当前主要输出目录如下：
@@ -182,28 +299,5 @@ python -m scripts.visualize_laser_buffer --help
 
 - 障碍物资源：[`assets/obstacle/`](./assets/obstacle)
 - 实机资源：[`assets/real/`](./assets/real)
-
-## 配置说明
-
-这个仓库目前还是“脚本 + 源码配置”混合形式，不是所有参数都有 CLI。
-
-主要需要改的地方有：
-
-- [`train.py`](./train.py)
-- [`test.py`](./test.py)
-- [`compare_methods/drlvo/config.py`](./compare_methods/drlvo/config.py)
-- [`compare_methods/vuca_nav/config.py`](./compare_methods/vuca_nav/config.py)
-- [`plot/`](./plot) 下各绘图脚本
-
-## 安装后快速验证
-
-建议先跑下面几个命令做冒烟测试：
-
-```bash
-python -m scripts.calc_flops
-python -m scripts.benchmark_policy_frequency
-python plot/plot_test_result_std.py
-python -m plot.reward_trend.plot_reward
-```
 
 英文版见 [`README.md`](./README.md)。
