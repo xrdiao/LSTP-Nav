@@ -1,0 +1,34 @@
+name: lstp
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pytorch=2.4.1
+  - torchvision=0.19.1
+  - torchaudio=2.4.1
+  - pytorch-cuda=12.4
+  - numpy
+  - scipy
+  - matplotlib
+  - pandas
+  - tqdm
+  - pyyaml
+  - scikit-learn
+  - rich
+  - gymnasium
+  - pybullet
+  - opencv
+  - tensorboard
+  - pillow
+  - ffmpeg
+  - pip
+  - pip:
+      - tensorboardX
+      - thop
+      - cvxpy
+      - cvxpylayers
+      - ecos
+      - gctl==1.2
+      - ir-sim>=2.4.0
