@@ -3,7 +3,7 @@ import torch
 from env_sim.env_util import *
 from train import create_env
 
-from evaluator import Evaluator
+from evaluation.evaluator import Evaluator
 
 agent_id = -1
 

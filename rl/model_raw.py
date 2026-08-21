@@ -55,7 +55,7 @@ class PPO:
             MODEL_DIR / f"{self.agent.name}_{self.env.name}.pth"
         )
         print('Loading agent', self.agent.name, 'from', model_path)
-        self.agent.load_state_dict(torch.load(model_path))
+        self.agent.load_state_dict(torch.load(model_path, map_location=self.device))
 
     def get_scan_data(self):
         laser_datas = []

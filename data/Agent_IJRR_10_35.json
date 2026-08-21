@@ -7,7 +7,7 @@
     "avg_step": 1655.3267990714469,
     "agent_name": "Agent_IJRR",
     "env_name": "circle",
-    "test_times": 500,
+    "test_times": 1000,
     "obstacles": 35,
     "laser_num": 130,
     "robots_num": 10,

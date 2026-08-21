@@ -15,8 +15,8 @@ except ImportError:
 
 BASE_DIR = Path(__file__).resolve().parent
 TARGET_DIRS = [
-    "with HS reward",
-    "without HS reward",
+    "with_hs_reward",
+    "without_hs_reward",
 ]
 HIGHLIGHT_LABEL = "LSTP-Net"
 HIGHLIGHT_COLOR = "red"

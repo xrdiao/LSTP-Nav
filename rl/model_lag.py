@@ -55,7 +55,7 @@ class PPOLag:
     def load_model(self):
         print('Loading agent', self.agent.name)
         model_path = MODEL_DIR / f"{self.agent.name}_{self.env.name}.pth"
-        self.agent.load_state_dict(torch.load(model_path))
+        self.agent.load_state_dict(torch.load(model_path, map_location=self.device))
 
     def get_scan_data(self):
         laser_datas = []
