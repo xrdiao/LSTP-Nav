@@ -308,16 +308,18 @@ agent = PPO(env, policy="AttentionAgent")
 
 如果您的工作中使用了这个仓库，请引用：
 
-```
-@ARTICLE{11660856,
-  author={Diao, Xingrong and Sun, Zhirui and Peng, Jianwei and Zhu, Bi-Ke and Jia, Baozhi and Wang, Jiankun},
-  journal={IEEE Transactions on Automation Science and Engineering}, 
-  title={LSTP-Nav: Lightweight Spatiotemporal Policy for Map-free Multi-agent Navigation with LiDAR}, 
-  year={2026},
-  volume={},
-  number={},
-  pages={1-1},
-  keywords={Deep reinforcement learning;distributed system;multi-agent;collision avoidance;map-free navigation},
-  doi={10.1109/TASE.2026.3725345}}
+> X. Diao, Z. Sun, J. Peng, B. -K. Zhu, B. Jia and J. Wang, "LSTP-Nav: Lightweight Spatiotemporal Policy for Map-free Multi-agent Navigation with LiDAR," in *IEEE Transactions on Automation Science and Engineering*, doi: 10.1109/TASE.2026.3725345.
+>
+> Keywords: Deep reinforcement learning; distributed system; multi-agent; collision avoidance; map-free navigation.
 
+BibTeX：
+
+```bibtex
+@article{diao2026lstpnav,
+  author   = {X. Diao and Z. Sun and J. Peng and B.-K. Zhu and B. Jia and J. Wang},
+  title    = {LSTP-Nav: Lightweight Spatiotemporal Policy for Map-free Multi-agent Navigation with LiDAR},
+  journal  = {IEEE Transactions on Automation Science and Engineering},
+  year     = {2026},
+  doi      = {10.1109/TASE.2026.3725345}
+}
 ```
