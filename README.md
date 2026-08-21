@@ -312,3 +312,16 @@ Static assets are stored in:
 ## Chinese Version
 
 See [`README_zh.md`](./README_zh.md).
+
+## Citation
+
+If you use this repository in academic work, please cite:
+
+```text
+X. Diao, Z. Sun, J. Peng, B. -K. Zhu, B. Jia and J. Wang,
+"LSTP-Nav: Lightweight Spatiotemporal Policy for Map-free Multi-agent Navigation with LiDAR,"
+in IEEE Transactions on Automation Science and Engineering,
+doi: 10.1109/TASE.2026.3725345.
+
+keywords: {Deep reinforcement learning;distributed system;multi-agent;collision avoidance;map-free navigation},
+```
