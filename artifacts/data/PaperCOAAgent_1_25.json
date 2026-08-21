@@ -1,0 +1,22 @@
+{
+    "avg_rewards": 46.03932361602783,
+    "collision_rate": 0.0,
+    "reach_rate": 1.0,
+    "trap_rate": 0.0,
+    "avg_time": 5.933739842775156,
+    "avg_step": 1717.709999828229,
+    "agent_name": "PaperCOAAgent",
+    "env_name": "circle",
+    "test_times": 100,
+    "obstacles": 25,
+    "laser_num": 130,
+    "robots_num": 1,
+    "x_lim": 10.0,
+    "y_lim": 10.0,
+    "var_avg_rewards": 0.016985506516175523,
+    "var_reach_rate": 0.0,
+    "var_trap_rate": 0.0,
+    "var_collision_rate": 0.0,
+    "var_avg_time": 0.3634579253121861,
+    "var_avg_step": 693.625795051245
+}

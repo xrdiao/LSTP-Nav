@@ -5,7 +5,7 @@ from train import create_env
 
 from evaluation.evaluator import Evaluator
 
-agent_id = -1
+agent_id = 0
 
 stack_laser = True
 if agent_id == 1:

@@ -1,0 +1,22 @@
+{
+    "avg_rewards": -142.27942450575998,
+    "collision_rate": 0.0994,
+    "reach_rate": 0.7754,
+    "trap_rate": 0.1252,
+    "avg_time": 41.32919532065235,
+    "avg_step": 1655.3267990714469,
+    "agent_name": "Agent_IJRR",
+    "env_name": "circle",
+    "test_times": 1000,
+    "obstacles": 35,
+    "laser_num": 130,
+    "robots_num": 10,
+    "x_lim": 10,
+    "y_lim": 10,
+    "var_avg_rewards": 983.9886247029601,
+    "var_reach_rate": 0.00017592063494932173,
+    "var_trap_rate": 0.00017592063494932146,
+    "var_collision_rate": 0.0,
+    "var_avg_time": 3.720036221081565,
+    "var_avg_step": 8736.808303953172
+}

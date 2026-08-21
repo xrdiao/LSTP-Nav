@@ -1,0 +1,22 @@
+{
+    "avg_rewards": 27.614110789299012,
+    "collision_rate": 0.39,
+    "reach_rate": 0.61,
+    "trap_rate": 0.0,
+    "avg_time": 15.9831153655819,
+    "avg_step": 1095.6557375253024,
+    "agent_name": "DRLVOAgent",
+    "env_name": "circle",
+    "test_times": 100,
+    "obstacles": 15,
+    "laser_num": 130,
+    "robots_num": 1,
+    "x_lim": 10.0,
+    "y_lim": 10.0,
+    "var_avg_rewards": 88.09507687445763,
+    "var_reach_rate": 0.0029772172981087338,
+    "var_trap_rate": 0.0,
+    "var_collision_rate": 0.002977217298108733,
+    "var_avg_time": 0.017080333475744256,
+    "var_avg_step": 3.4001613637809003
+}

@@ -106,6 +106,7 @@ def keyboard_control():
         next_obs, reward, te, tr, info_ = env.step(vel)
 
         # env.plot_in_plt()
+        LASER_BUFFER_PATH.parent.mkdir(parents=True, exist_ok=True)
         np.save(LASER_BUFFER_PATH, env.robots[0].laser_buffer)
 
         need_reset = any(tr) or any(te)

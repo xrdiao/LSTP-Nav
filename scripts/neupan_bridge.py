@@ -1,4 +1,3 @@
-from neupan import neupan
 import numpy as np
 
 from pathlib import Path
@@ -14,7 +13,12 @@ from tqdm.auto import tqdm
 import json
 import time
 
-from project_paths import DATA_DIR, NEUPAN_CONVEX_DIFF_PLANNER_PATH
+from project_paths import DATA_DIR, NEUPAN_CONVEX_DIFF_PLANNER_PATH, NEUPAN_DIR
+
+if str(NEUPAN_DIR) not in sys.path:
+    sys.path.insert(0, str(NEUPAN_DIR))
+
+from neupan import neupan
 
 def get_robot_state(env, robot_id):
     scans = {

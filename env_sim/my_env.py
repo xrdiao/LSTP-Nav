@@ -21,14 +21,14 @@ import warnings
 warnings.filterwarnings("ignore")
 
 try:
-    from project_paths import TURTLEBOT_URDF_PATH
+    from project_paths import OBSTACLE_DIR, TURTLEBOT_URDF_PATH
 except ImportError:
     import sys
 
     PROJECT_ROOT = Path(__file__).resolve().parents[1]
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
-    from project_paths import TURTLEBOT_URDF_PATH
+    from project_paths import OBSTACLE_DIR, TURTLEBOT_URDF_PATH
 
 
 class MyEnv(gym.Env):
@@ -149,7 +149,7 @@ class MyEnv(gym.Env):
                 "height" :0.
             },
         }
-        self.obstacle_path = './obstacle'
+        self.obstacle_path = str(OBSTACLE_DIR)
 
     def set_max_step(self, max_step):
         self.max_simulate_steps = max_step
@@ -1037,8 +1037,9 @@ class MyEnv(gym.Env):
             self.init_goal.append(goal[i])
             # self.add_robot(state, goal[i])
 
-    def save_obstacles_to_json(self, file_path='./obstacle/1.json'):
+    def save_obstacles_to_json(self, file_path=None):
         """将当前环境障碍物保存为JSON文件"""
+        file_path = Path(file_path) if file_path is not None else (OBSTACLE_DIR / "1.json")
         obstacles_data = []
         for obs in self.obstacles:
             # 确保数据类型可序列化
@@ -1052,19 +1053,21 @@ class MyEnv(gym.Env):
             obstacles_data.append(obstacle_dict)
         
         try:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
             with open(file_path, 'w') as f:
                 json.dump(obstacles_data, f, indent=4)
             print(f"障碍物信息已保存至: {file_path}")
         except Exception as e:
             print(f"保存失败: {str(e)}")
 
-    def load_and_place_obstacles(self, file_path='./obstacle/1.json'):
+    def load_and_place_obstacles(self, file_path=None):
         """
         从JSON文件读取障碍物信息并放置到环境中
         
         参数:
             file_path: JSON文件路径
         """
+        file_path = Path(file_path) if file_path is not None else (OBSTACLE_DIR / "1.json")
         try:
             with open(file_path, 'r') as f:
                 obstacles_data = json.load(f)

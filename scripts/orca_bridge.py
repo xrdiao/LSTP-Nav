@@ -10,16 +10,19 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import rvo.math as rvo_math
 import numpy as np
-from rvo.vector import Vector2
-from rvo.simulator import Simulator
-
 from env_sim.env_util import *
 from env_sim.argument import *
 from train import create_env
 
-from project_paths import DATA_DIR
+from project_paths import COMPARE_METHODS_DIR, DATA_DIR
+
+if str(COMPARE_METHODS_DIR) not in sys.path:
+    sys.path.insert(0, str(COMPARE_METHODS_DIR))
+
+import rvo.math as rvo_math
+from rvo.vector import Vector2
+from rvo.simulator import Simulator
 
 # Constants
 ROBOT_WIDTH = 0.5  # Should be defined in argument.py or here
