@@ -10,6 +10,8 @@ PhysReplay-SimLab 是本项目使用的 PyBullet 训练环境。它通过回放�
 
 仓库中还收纳了多个对比方法，统一放在 [`compare_methods/`](./compare_methods) 下，并配套了评测、绘图和输出管理流程。
 
+项目主页：[https://sites.google.com/view/lstp-nav](https://sites.google.com/view/lstp-nav)
+
 ## 目录结构
 
 ```text
