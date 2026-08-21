@@ -1,14 +1,25 @@
 import pybullet_data
 import torch
+from pathlib import Path
 from env_sim.my_env import MyEnv
 import numpy as np
 import pybullet as p
 from env_sim.argument import *
 
+try:
+    from project_paths import TURTLEBOT_URDF_PATH
+except ImportError:
+    import sys
+
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import TURTLEBOT_URDF_PATH
+
 class RENV(MyEnv):
 
-    def __init__(self, env_args, urdf_path = '/home/oem/direction_based_obstacle_avoidance/env_sim/utils/data/turtlebot.urdf'):
-        super().__init__(env_args, urdf_path)
+    def __init__(self, env_args, urdf_path=None):
+        super().__init__(env_args, urdf_path or str(TURTLEBOT_URDF_PATH))
         self.device = 'cuda'
         self.num_privileged_obs = None
 

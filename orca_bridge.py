@@ -2,6 +2,7 @@ import json
 import math
 import random
 import time
+from pathlib import Path
 from tqdm.auto import tqdm
 
 import rvo.math as rvo_math
@@ -12,6 +13,16 @@ from rvo.simulator import Simulator
 from env_sim.env_util import *
 from env_sim.argument import *
 from train import create_env
+
+try:
+    from project_paths import DATA_DIR
+except ImportError:
+    import sys
+
+    PROJECT_ROOT = Path(__file__).resolve().parent
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import DATA_DIR
 
 # Constants
 ROBOT_WIDTH = 0.5  # Should be defined in argument.py or here
@@ -274,8 +285,9 @@ class ExperimentRunner:
             'y_lim': self.env.y_lim
         }
 
-        filename = f"./data/ORCA_{self.env.robots_num}_{self.env.random_obstacles}.json"
-        with open(filename, 'w') as f:
+        filename = DATA_DIR / f"ORCA_{self.env.robots_num}_{self.env.random_obstacles}.json"
+        filename.parent.mkdir(parents=True, exist_ok=True)
+        with filename.open('w') as f:
             json.dump(data_dict, f, sort_keys=False, indent=4, separators=(',', ': '))
 
 def main(robot_num=1, obs_num=15):

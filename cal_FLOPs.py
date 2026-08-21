@@ -1,8 +1,19 @@
 import os
+from pathlib import Path
 import torch
 from thop import profile, clever_format
 
 from rl.util_raw import *
+
+try:
+    from project_paths import MODEL_DIR
+except ImportError:
+    import sys
+
+    PROJECT_ROOT = Path(__file__).resolve().parent
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import MODEL_DIR
 
 # =========================
 # 1. Load model
@@ -11,7 +22,7 @@ agent_name = 'Agent_Lstm_Attn'
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 agent = AttentionAgent().to(device)
-ckpt_path = 'model/' + agent_name + '_' + 'circle' + '.pth'
+ckpt_path = MODEL_DIR / f"{agent_name}_circle.pth"
 agent.load_state_dict(torch.load(ckpt_path, map_location=device))
 agent.eval()
 

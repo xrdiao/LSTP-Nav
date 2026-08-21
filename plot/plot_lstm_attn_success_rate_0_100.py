@@ -1,5 +1,5 @@
 import json
-import os
+from pathlib import Path
 
 import matplotlib
 
@@ -14,6 +14,16 @@ rcParams["font.family"] = "sans-serif"
 rcParams["font.sans-serif"] = ["Noto Sans CJK JP", "DejaVu Sans"]
 rcParams["axes.unicode_minus"] = False
 
+try:
+    from project_paths import DATA_DIR, FIG_DIR
+except ImportError:
+    import sys
+
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import DATA_DIR, FIG_DIR
+
 
 AGENT_NAME = "Agent_Lstm_Attn"
 ROBOT_COUNTS = [40, 80, 120, 160, 200]
@@ -23,19 +33,16 @@ STYLE_MAP = {
     100: {"color": "#d62728", "label": "Obstacle Count = 100"},
 }
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-FIG_DIR = os.path.join(BASE_DIR, "fig")
-OUTPUT_PATH = os.path.join(FIG_DIR, "agent_lstm_attn_success_rate_0_100.png")
+OUTPUT_PATH = FIG_DIR / "agent_lstm_attn_success_rate_0_100.png"
 
 
 def load_record(robot_count, obstacle_count):
     file_name = f"{AGENT_NAME}_{robot_count}_{obstacle_count}.json"
-    file_path = os.path.join(DATA_DIR, file_name)
-    if not os.path.exists(file_path):
+    file_path = DATA_DIR / file_name
+    if not file_path.exists():
         raise FileNotFoundError(f"Missing data file: {file_path}")
 
-    with open(file_path, "r", encoding="utf-8") as file:
+    with file_path.open("r", encoding="utf-8") as file:
         record = json.load(file)
 
     if record.get("agent_name") != AGENT_NAME:
@@ -70,7 +77,7 @@ def build_series():
 
 
 def plot_series(series):
-    os.makedirs(FIG_DIR, exist_ok=True)
+    FIG_DIR.mkdir(parents=True, exist_ok=True)
 
     fig, ax = plt.subplots(figsize=(8.8, 5.6), dpi=150)
 

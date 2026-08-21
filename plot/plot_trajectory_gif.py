@@ -14,6 +14,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from project_paths import FIG_TRAJECTORY_GIF_DIR
+
 from plot.plot_trajectory import (
     DEFAULT_TRAJECTORY_ROOT,
     _as_xy,
@@ -27,7 +29,7 @@ from plot.plot_trajectory import (
 )
 
 
-DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "fig" / "trajectory_gif"
+DEFAULT_OUTPUT_ROOT = FIG_TRAJECTORY_GIF_DIR
 DEFAULT_MAX_FRAMES = 600
 DEFAULT_END_HOLD_SECONDS = 1.5
 

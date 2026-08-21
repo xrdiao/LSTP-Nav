@@ -9,6 +9,7 @@
 import os
 import re
 import glob
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Dict, List, Tuple, Optional
 
@@ -17,10 +18,20 @@ import matplotlib.pyplot as plt
 
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
+try:
+    from project_paths import RUNS_DIR
+except ImportError:
+    import sys
+
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import RUNS_DIR
+
 # ---------------------------
 # 配置区：改这里就行
 # ---------------------------
-BASE = "/home/oem/direction_based_obstacle_avoidance/runs"
+BASE = str(RUNS_DIR)
 
 RUN_A = os.path.join(BASE, "ori_coef_0.05/Agent_Lstm_Attn")
 RUN_B = os.path.join(BASE, "ori_coef_0.08/Agent_Lstm_Attn")

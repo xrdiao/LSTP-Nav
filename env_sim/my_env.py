@@ -2,6 +2,7 @@ import json
 import math
 import random
 import time
+from pathlib import Path
 from typing import Optional, Dict, Any
 
 import pybullet as p
@@ -19,9 +20,19 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
+try:
+    from project_paths import TURTLEBOT_URDF_PATH
+except ImportError:
+    import sys
+
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import TURTLEBOT_URDF_PATH
+
 
 class MyEnv(gym.Env):
-    def __init__(self, env_args, urdf_path: Optional[str] = '/home/oem/direction_based_obstacle_avoidance/env_sim/utils/data/turtlebot.urdf'):
+    def __init__(self, env_args, urdf_path: Optional[str] = None):
         """
         :param env_args: Arguments to environment
         :param urdf_path: the urdf path of robot
@@ -69,7 +80,7 @@ class MyEnv(gym.Env):
         self.reach_num = 0
 
         self.num_envs = self.robots_num = self.env_args.robots_num
-        self.urdf_path = urdf_path
+        self.urdf_path = urdf_path or str(TURTLEBOT_URDF_PATH)
         self.TARGET_VELOCITY = TARGET_VELOCITY
         self.LASER_NUM = LASER_NUM
         self.LASER_LENGTH = LASER_LENGTH

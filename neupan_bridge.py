@@ -1,15 +1,22 @@
 from neupan import neupan
 import numpy as np
 
-import os
+from pathlib import Path
 from env_sim.env_util import *
 from train import create_env
 from tqdm.auto import tqdm
 import json
 import time
 
-base_path = os.path.dirname(os.path.abspath(__file__))
-urdf_path = base_path + '/env_sim/utils/data/turtlebot.urdf'
+try:
+    from project_paths import DATA_DIR, NEUPAN_CONVEX_DIFF_PLANNER_PATH, TURTLEBOT_URDF_PATH
+except ImportError:
+    import sys
+
+    PROJECT_ROOT = Path(__file__).resolve().parent
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import DATA_DIR, NEUPAN_CONVEX_DIFF_PLANNER_PATH, TURTLEBOT_URDF_PATH
 
 def get_robot_state(env, robot_id):
     scans = {
@@ -42,7 +49,7 @@ def nerpan_step(
     return action
 
 def run(env, times=1000):
-    planner_path_file = "/home/oem/direction_based_obstacle_avoidance/NeuPAN/example/convex_obs/diff/planner.yaml"
+    planner_path_file = str(NEUPAN_CONVEX_DIFF_PLANNER_PATH)
     controllers = []
     rewards = []
     next_obs_, _ = env.reset()
@@ -185,7 +192,9 @@ def run(env, times=1000):
             })
 
             data_json = json.dumps(data_dict, sort_keys=False, indent=4, separators=(',', ': '))
-            with open(r'./data/' + 'nerpan' + '_' + str(env.robots_num) + '_' + str(env.random_obstacles) + '.json', 'w') as f:
+            output_path = DATA_DIR / f"nerpan_{env.robots_num}_{env.random_obstacles}.json"
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with output_path.open('w') as f:
                 f.write(data_json)
 
 def main(robot_num=1, obs_num=15):

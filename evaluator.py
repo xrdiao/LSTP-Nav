@@ -1,12 +1,22 @@
 import copy
 import os
+from pathlib import Path
 from rl.util_raw import *
-# from rl.SAC_util import *
 import time
 import pybullet as p
 from recorder import Recorder
 import json
 from tqdm.auto import tqdm
+
+try:
+    from project_paths import DATA_DIR, MODEL_DIR, PATH_DIR, RECORD_TRAJECTORY_DIR
+except ImportError:
+    import sys
+
+    PROJECT_ROOT = Path(__file__).resolve().parent
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import DATA_DIR, MODEL_DIR, PATH_DIR, RECORD_TRAJECTORY_DIR
 
 class Evaluator(object):
     def __init__(self, env, agent=None, is_PPO=True, is_pre=False, stack_laser=False,
@@ -27,17 +37,12 @@ class Evaluator(object):
 
         if agent is None:
             self.agent = RandomAgent()
-        elif is_PPO:
-            self.agent = agent().to(self.device)
-            load_path = model_path or ('model/' + self.agent.name + '_' + self.env.name + '.pth')
-            self.agent.load_state_dict(torch.load(load_path))
-        elif is_pre:
-            self.agent = agent().to(self.device)
-            load_path = model_path or ('model/pre_' + self.agent.name + '.pth')
-            self.agent.load_state_dict(torch.load(load_path))
         else:
             self.agent = agent().to(self.device)
-            load_path = model_path or ('model/' + 'sac' + '.pth')
+            if is_pre:
+                load_path = model_path or (MODEL_DIR / f"pre_{self.agent.name}.pth")
+            else:
+                load_path = model_path or (MODEL_DIR / f"{self.agent.name}_{self.env.name}.pth")
             self.agent.load_state_dict(torch.load(load_path))
 
         self.tra_color = [
@@ -71,12 +76,9 @@ class Evaluator(object):
         return positions
 
     def save_current_test_trajectory(self, test_index):
-        trajectory_dir = os.path.join(
-            './record_trajectory',
-            '{}_{}_{}'.format(self.agent.name, self.robots_num, self.env.random_obstacles)
-        )
-        os.makedirs(trajectory_dir, exist_ok=True)
-        self.recorder.save(os.path.join(trajectory_dir, '{}.pkl'.format(test_index)))
+        trajectory_dir = RECORD_TRAJECTORY_DIR / f"{self.agent.name}_{self.robots_num}_{self.env.random_obstacles}"
+        trajectory_dir.mkdir(parents=True, exist_ok=True)
+        self.recorder.save(trajectory_dir / f"{test_index}.pkl")
 
     def get_obstacle_records(self):
         if hasattr(self.env, 'get_obstacle_records'):
@@ -206,9 +208,9 @@ class Evaluator(object):
                         self.last_position = [state[:3] for state in self.env.init_state]
                         if self.save_artifacts:
                             self.save_current_test_trajectory(z)
-                            path_dir = os.path.join('./path', self.agent.name)
-                            os.makedirs(path_dir, exist_ok=True)
-                            self.recorder.save(os.path.join(path_dir, '{}.pkl'.format(z)))
+                            path_dir = PATH_DIR / self.agent.name
+                            path_dir.mkdir(parents=True, exist_ok=True)
+                            self.recorder.save(path_dir / f"{z}.pkl")
                             self.recorder.clear()
                         break
 
@@ -262,13 +264,11 @@ class Evaluator(object):
         data_dict.update(self.metadata)
 
         data_json = json.dumps(data_dict, sort_keys=False, indent=4, separators=(',', ': '))
-        result_path = self.result_path or (
-            r'./data/' + self.agent.name + '_' + str(self.robots_num) + '_' + str(self.env.random_obstacles) + '.json'
+        result_path = Path(self.result_path) if self.result_path is not None else (
+            DATA_DIR / f"{self.agent.name}_{self.robots_num}_{self.env.random_obstacles}.json"
         )
-        result_dir = os.path.dirname(result_path)
-        if result_dir:
-            os.makedirs(result_dir, exist_ok=True)
-        with open(result_path, 'w') as f:
+        result_path.parent.mkdir(parents=True, exist_ok=True)
+        with result_path.open('w') as f:
             f.write(data_json)
 
         return data_dict

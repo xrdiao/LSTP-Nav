@@ -1,5 +1,6 @@
 import copy
 from collections import deque
+from pathlib import Path
 
 import cv2
 import pybullet as p
@@ -8,6 +9,16 @@ from functools import partial
 from matplotlib import pyplot as plt
 from env_sim.argument import *
 import torch
+
+try:
+    from project_paths import TURTLEBOT_URDF_PATH
+except ImportError:
+    import sys
+
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import TURTLEBOT_URDF_PATH
 
 
 class Node:
@@ -81,7 +92,7 @@ class Graph:
 
 class Robot(object):
     def __init__(self, base_pos: list = None, base_ori: list = None, client_id: int = 0,
-                 urdf_path="/home/oem/direction_based_obstacle_avoidance/env_sim/utils/data/turtlebot.urdf",
+                 urdf_path=None,
                  robot_camera=False, lidar_noise_std=0.01, lidar_noise_clip=0.01,
                  lidar_dropout_ratio=0.0, lidar_max_range=LASER_LENGTH):
         if base_ori is None:
@@ -89,7 +100,7 @@ class Robot(object):
         if base_pos is None:
             base_pos = [0., 0., 0.]
         self.client_id = client_id
-        self.urdf_path = urdf_path
+        self.urdf_path = urdf_path or str(TURTLEBOT_URDF_PATH)
         self.robot = p.loadURDF(
             fileName=self.urdf_path,
             basePosition=base_pos,

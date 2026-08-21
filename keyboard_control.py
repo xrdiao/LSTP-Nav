@@ -1,8 +1,8 @@
 import time
 import torch
 from env_sim.env_util import *
+from pathlib import Path
 
-import os
 import pybullet as p
 import numpy as np
 
@@ -11,8 +11,15 @@ from rl.util import *
 # from rl.util_raw import *
 from orca_bridge import SimulatorBridge
 
-base_path = os.path.dirname(os.path.abspath(__file__))
-urdf_path = base_path + '/env_sim/utils/data/turtlebot.urdf'
+try:
+    from project_paths import LASER_BUFFER_PATH, TURTLEBOT_URDF_PATH
+except ImportError:
+    import sys
+
+    PROJECT_ROOT = Path(__file__).resolve().parent
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import LASER_BUFFER_PATH, TURTLEBOT_URDF_PATH
 
 def keyboard_callback(env=None):
     key_dict = p.getKeyboardEvents()
@@ -62,7 +69,7 @@ def keyboard_control():
     env_arg.radius = 7
     # env_arg.robot_camera = True
 
-    env = MyEnv(env_arg, urdf_path=urdf_path)
+    env = MyEnv(env_arg, urdf_path=str(TURTLEBOT_URDF_PATH))
     sim_bridge = SimulatorBridge(env)
 
     next_obs, _ = env.reset()
@@ -70,7 +77,7 @@ def keyboard_control():
 
     device = 'cuda'
     agent = LinearAgent().to(device)
-    # agent.load_state_dict(torch.load('model/' + agent.name + '_' + env.name + '.pth'))
+    # Optional manual checkpoint loading can be added here if needed.
     convert = agent.convert_action_for_env
 
     random_agent = RandomAgent().to(device)
@@ -102,7 +109,7 @@ def keyboard_control():
         next_obs, reward, te, tr, info_ = env.step(vel)
 
         # env.plot_in_plt()
-        np.save('laser_buffer', env.robots[0].laser_buffer)
+        np.save(LASER_BUFFER_PATH, env.robots[0].laser_buffer)
 
         need_reset = any(tr) or any(te)
         next_obs = env.reset(tr=tr, te=te)[0] if need_reset else next_obs

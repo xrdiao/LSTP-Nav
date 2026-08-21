@@ -10,10 +10,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Circle, Polygon
 
+try:
+    from project_paths import FIG_TRAJECTORY_DIR, RECORD_TRAJECTORY_DIR
+except ImportError:
+    import sys
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TRAJECTORY_ROOT = PROJECT_ROOT / "record_trajectory"
-DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "fig" / "trajectory"
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import FIG_TRAJECTORY_DIR, RECORD_TRAJECTORY_DIR
+
+
+DEFAULT_TRAJECTORY_ROOT = RECORD_TRAJECTORY_DIR
+DEFAULT_OUTPUT_ROOT = FIG_TRAJECTORY_DIR
 
 
 class NumpyCompatUnpickler(pickle.Unpickler):

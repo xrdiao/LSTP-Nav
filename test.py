@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 import torch
 from env_sim.env_util import *
 from train import create_env
@@ -14,9 +14,6 @@ if stack_laser:
     from rl.model_raw import *
 else:
     from rl.model import *
-
-base_path = os.path.dirname(os.path.abspath(__file__))
-urdf_path = base_path + '/env_sim/utils/data/turtlebot.urdf'
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 env_name = ['circle', 'u', 'dumbbell', 'room']

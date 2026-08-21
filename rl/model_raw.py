@@ -1,5 +1,6 @@
 import os
 import time
+from pathlib import Path
 from datetime import datetime
 from rl.normalization import RewardScaling
 from rl.util_raw import *
@@ -12,6 +13,14 @@ import sys
 
 base_path = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(base_path + '\\rl')
+
+try:
+    from project_paths import MODEL_DIR, RUNS_DIR
+except ImportError:
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import MODEL_DIR, RUNS_DIR
 
 
 class PPO:
@@ -42,7 +51,9 @@ class PPO:
         self.reward_scaling = RewardScaling(1, self.args.gamma)
 
     def load_model(self, model_path=None):
-        model_path = model_path or ('model/' + self.agent.name + '_' + self.env.name + '.pth')
+        model_path = Path(model_path) if model_path is not None else (
+            MODEL_DIR / f"{self.agent.name}_{self.env.name}.pth"
+        )
         print('Loading agent', self.agent.name, 'from', model_path)
         self.agent.load_state_dict(torch.load(model_path))
 
@@ -79,12 +90,18 @@ class PPO:
     def train(self, random_robot: float = 3, run_name=None, model_save_path=None, show_progress=True):
         # 环境反馈的频率为 FPS / 240 Hz，FPS设置为10意味着24Hz
         time_stamp = "{0:%Y-%m-%d-%H}".format(datetime.now())
-        run_name = run_name or f"runs/{time_stamp}/{self.agent.name}/{'circle'}"
-        model_save_path = model_save_path or f'model/{self.agent.name}_{self.env.name}.pth'
+        run_name = Path(run_name) if run_name is not None else (
+            RUNS_DIR / time_stamp / self.agent.name / "circle"
+        )
+        model_save_path = Path(model_save_path) if model_save_path is not None else (
+            MODEL_DIR / f"{self.agent.name}_{self.env.name}.pth"
+        )
+        run_name.mkdir(parents=True, exist_ok=True)
+        model_save_path.parent.mkdir(parents=True, exist_ok=True)
         self.robots_num = self.env.robots_num
         torch.backends.cudnn.deterministic = self.args.torch_deterministic
 
-        writer = SummaryWriter(log_dir=run_name)
+        writer = SummaryWriter(log_dir=str(run_name))
         writer.add_text(
             "hyperparameters",
             "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(self.args).items()])),

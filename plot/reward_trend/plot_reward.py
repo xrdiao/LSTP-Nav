@@ -1,15 +1,26 @@
-import os
+from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+try:
+    from project_paths import FIG_DIR
+except ImportError:
+    import sys
+
+    PROJECT_ROOT = Path(__file__).resolve().parents[2]
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import FIG_DIR
+
+BASE_DIR = Path(__file__).resolve().parent
 TARGET_DIRS = [
     "with HS reward",
     "without HS reward",
 ]
 HIGHLIGHT_LABEL = "LSTP-Net"
 HIGHLIGHT_COLOR = "red"
+OUTPUT_DIR = FIG_DIR / "reward_trend"
 
 def tensorboard_smooth(scalars, weight=0.6):
     """TensorBoard使用的指数加权移动平均平滑算法"""
@@ -34,8 +45,8 @@ def sort_files_for_legend(files):
     return sorted(
         files,
         key=lambda file_path: (
-            os.path.splitext(os.path.basename(file_path))[0] == HIGHLIGHT_LABEL,
-            os.path.basename(file_path).lower(),
+            file_path.stem == HIGHLIGHT_LABEL,
+            file_path.name.lower(),
         ),
     )
 
@@ -43,16 +54,12 @@ def plot_separate_tensorboard_figures():
     # 仅从指定子目录读取CSV文件
     file_groups = {}
     for relative_dir in TARGET_DIRS:
-        input_dir = os.path.join(BASE_DIR, relative_dir)
-        if not os.path.isdir(input_dir):
+        input_dir = BASE_DIR / relative_dir
+        if not input_dir.is_dir():
             print(f"目录不存在，已跳过: {input_dir}")
             continue
 
-        csv_files = sorted(
-            os.path.join(input_dir, file_name)
-            for file_name in os.listdir(input_dir)
-            if file_name.endswith(".csv")
-        )
+        csv_files = sorted(path for path in input_dir.iterdir() if path.suffix == ".csv")
         if csv_files:
             file_groups[relative_dir] = sort_files_for_legend(csv_files)
 
@@ -60,8 +67,7 @@ def plot_separate_tensorboard_figures():
         print("没有在指定文件夹中找到任何CSV文件")
         return
 
-    output_dir = os.path.join(BASE_DIR, "fig")
-    os.makedirs(output_dir, exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     
     # 使用tab20颜色循环
     prop_cycle = plt.rcParams['axes.prop_cycle']
@@ -80,7 +86,7 @@ def plot_separate_tensorboard_figures():
                 
                 if 'Step' in df.columns and 'Value' in df.columns:
                     # 提取指标名称作为图例标签
-                    label = os.path.splitext(os.path.basename(file))[0]
+                    label = file.stem
                     
                     # 获取当前颜色
                     color = HIGHLIGHT_COLOR if label == HIGHLIGHT_LABEL else colors[i % len(colors)]
@@ -124,7 +130,7 @@ def plot_separate_tensorboard_figures():
         plt.tight_layout()
 
         output_name = f"{group_name.lower().replace(' ', '_')}.png"
-        output_path = os.path.join(output_dir, output_name)
+        output_path = OUTPUT_DIR / output_name
         plt.savefig(output_path, dpi=300, bbox_inches="tight")
         plt.close()
         print(f"已保存图像: {output_path}")

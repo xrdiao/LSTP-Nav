@@ -1,5 +1,6 @@
 import copy
 from collections import deque
+from pathlib import Path
 
 import torch
 from torch import optim
@@ -12,6 +13,15 @@ from tensorboardX import SummaryWriter
 from datetime import datetime
 import numpy as np
 import time
+import sys
+
+try:
+    from project_paths import MODEL_DIR, RUNS_DIR
+except ImportError:
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import MODEL_DIR, RUNS_DIR
 
 
 class PPOLag:
@@ -44,7 +54,8 @@ class PPOLag:
 
     def load_model(self):
         print('Loading agent', self.agent.name)
-        self.agent.load_state_dict(torch.load('model/' + self.agent.name + '_' + self.env.name + '.pth'))
+        model_path = MODEL_DIR / f"{self.agent.name}_{self.env.name}.pth"
+        self.agent.load_state_dict(torch.load(model_path))
 
     def get_scan_data(self):
         laser_datas = []
@@ -91,11 +102,12 @@ class PPOLag:
     def update(self, FPS=3, lim=3):
         # 环境反馈的频率为 FPS / 240 Hz，FPS设置为10意味着24Hz
         time_stamp = "{0:%Y-%m-%d-%H}".format(datetime.now())
-        run_name = f"runs/{time_stamp}/{self.agent.name}/{self.env.name}"
+        run_name = RUNS_DIR / time_stamp / self.agent.name / self.env.name
+        run_name.mkdir(parents=True, exist_ok=True)
         self.robots_num = self.env.robots_num
         torch.backends.cudnn.deterministic = self.args.torch_deterministic
 
-        writer = SummaryWriter(log_dir=run_name)
+        writer = SummaryWriter(log_dir=str(run_name))
         writer.add_text(
             "hyperparameters",
             "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(self.args).items()])),
@@ -310,7 +322,9 @@ class PPOLag:
                 'BEST': f'{recent_best_reward:.2f}',
                 'bestTestRewards': f'{max_reward:.2f}'
             })
-            torch.save(self.agent.state_dict(), 'model/' + self.agent.name + '_' + self.env.name + '.pth')
+            model_path = MODEL_DIR / f"{self.agent.name}_{self.env.name}.pth"
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+            torch.save(self.agent.state_dict(), model_path)
             self.epsilon = self.min_epsilon + (self.max_epsilon - self.min_epsilon) * np.exp(-self.decay_rate * update)
             if reach_times >= 10:
                 print(

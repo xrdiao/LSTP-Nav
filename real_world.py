@@ -1,4 +1,5 @@
 import rospy
+from pathlib import Path
 from sensor_msgs.msg import LaserScan
 from collections import deque
 import numpy as np
@@ -9,6 +10,16 @@ import time
 import argparse
 from distutils.util import strtobool
 from scipy.spatial.transform import Rotation as R
+
+try:
+    from project_paths import MODEL_DIR
+except ImportError:
+    import sys
+
+    PROJECT_ROOT = Path(__file__).resolve().parent
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import MODEL_DIR
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--name", type=str, default='', nargs="?", const=True, help="the name of the environment")
@@ -74,10 +85,10 @@ class RealWorld:
         goal = np.array([3.5, 0])
 
         agent = LstmAgent()
-        agent.load_state_dict(torch.load('model/' + 'Agent_Lstm' + '_' + 'base' + '.pth'))
+        agent.load_state_dict(torch.load(MODEL_DIR / "Agent_Lstm_base.pth"))
 
         # agent=AttentionAgent()
-        # agent.load_state_dict(torch.load('model/' + 'AttentionAgent' + '_' + 'circle' + '.pth'))
+        # agent.load_state_dict(torch.load(MODEL_DIR / "AttentionAgent_circle.pth"))
 
         convert = agent.convert_action_for_env
 

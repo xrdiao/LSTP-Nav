@@ -1,6 +1,6 @@
-import os
 import json
 from collections import defaultdict
+from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
@@ -17,6 +17,16 @@ try:
     import pandas as pd
 except ImportError:  # pragma: no cover
     pd = None
+
+try:
+    from project_paths import DATA_DIR, FIG_DIR
+except ImportError:
+    import sys
+
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from project_paths import DATA_DIR, FIG_DIR
 
 METRICS = ["reach_rate", "collision_rate", "trap_rate", "avg_time", "avg_step"]
 RATE_METRICS = {"reach_rate", "collision_rate", "trap_rate"}
@@ -41,11 +51,12 @@ NAME_AGENT_MAP = {
 X_OBS = [5, 10, 15, 20, 25, 30, 35]
 PLOT_ROBOTS = [1, 5, 10]
 
-def load_all_json(data_dir="./data"):
+def load_all_json(data_dir=DATA_DIR):
+    data_dir = Path(data_dir)
     data = []
-    for fn in sorted(os.listdir(data_dir)):
-        if fn.endswith(".json"):
-            with open(os.path.join(data_dir, fn), "r", encoding="utf-8") as f:
+    for path in sorted(data_dir.glob("*.json")):
+        if path.suffix == ".json":
+            with path.open("r", encoding="utf-8") as f:
                 data.append(json.load(f))
     return data
 
@@ -232,12 +243,13 @@ def plot_all_agents_one_subplot(
     plt.tight_layout(rect=(0, 0, 1, layout_top))
     # plt.show()
 
-    fig.savefig("./fig/comparison_plot.png", dpi=300, bbox_inches="tight", pad_inches=0.05)
+    output_path = FIG_DIR / "comparison_plot.png"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=300, bbox_inches="tight", pad_inches=0.05)
 
 if __name__ == "__main__":
     # 根目录 data 中同时保存均值字段和方差字段（var_*）。
-    data_dir = "/home/oem/direction_based_obstacle_avoidance/data"
-    data_list = load_all_json(data_dir)
+    data_list = load_all_json(DATA_DIR)
 
     table, robots_nums, agents = build_table(data_list, METRICS)
     VAR_METRICS = ["var_" + m for m in METRICS]
