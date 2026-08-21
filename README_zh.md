@@ -301,3 +301,16 @@ agent = PPO(env, policy="AttentionAgent")
 - 实机资源：[`assets/real/`](./assets/real)
 
 英文版见 [`README.md`](./README.md)。
+
+## 引用
+
+如果您的工作中使用了这个仓库，请引用：
+
+```text
+X. Diao, Z. Sun, J. Peng, B. -K. Zhu, B. Jia and J. Wang,
+"LSTP-Nav: Lightweight Spatiotemporal Policy for Map-free Multi-agent Navigation with LiDAR,"
+in IEEE Transactions on Automation Science and Engineering,
+doi: 10.1109/TASE.2026.3725345.
+
+keywords: {Deep reinforcement learning;distributed system;multi-agent;collision avoidance;map-free navigation},
+```
